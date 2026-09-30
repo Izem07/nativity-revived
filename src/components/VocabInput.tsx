@@ -24,29 +24,6 @@ const WORD_NUMBER_BADGE_BASE_WIDTH = 28;
 const WORD_NUMBER_BADGE_WIDTH_PER_DIGIT = 8;
 const PRE_FILLED_LISTS = [
   {
-    label: 'Insect Vocabulary (18 Words)',
-    words: [
-      'Embryonic',
-      'Entomologist',
-      'Indefatigable',
-      'Indigenous',
-      'Industrious',
-      'Iridescent',
-      'Insatiable',
-      'Insecticide',
-      'Larvae',
-      'Metamorphosis',
-      'Nemesis',
-      'Nocturnal',
-      'Pollinate',
-      'Proboscis',
-      'Quarantine',
-      'Subterranean',
-      'Trepidation',
-      'Ubiquitous',
-    ],
-  },
-  {
     label: 'Vocab List 2 (20 Words)',
     words: [
       'Candid',

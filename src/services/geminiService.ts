@@ -70,7 +70,7 @@ export const generateQuizContent = async (vocabularyList: string[]): Promise<Qui
   try {
     const API_KEY = getAPIKey();
     const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const vocabString = vocabularyList.join(', ');
 
@@ -211,7 +211,7 @@ export const generateMoreQuizQuestions = async (
   try {
     const API_KEY = getAPIKey();
     const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const vocabString = vocabularyList.join(', ');
 
@@ -265,7 +265,7 @@ export const generateMoreParagraph = async (
   try {
     const API_KEY = getAPIKey();
     const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const vocabString = vocabularyList.join(', ');
 
@@ -322,7 +322,7 @@ export const generateHangmanWords = async (
   try {
     const API_KEY = getAPIKey();
     const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     let prompt = '';
     if (difficulty === 'custom') {
