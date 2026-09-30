@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Plus, Sparkles, KeyRound, X, ShieldCheck, ClipboardPaste, Info, RefreshCw, Database } from 'lucide-react';
+import { Plus, Sparkles, KeyRound, X, ShieldCheck, ClipboardPaste, Info, Database } from 'lucide-react';
 import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
@@ -76,6 +76,7 @@ export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [cacheDialogOpen, setCacheDialogOpen] = useState(false);
   const [pendingWords, setPendingWords] = useState<string[]>([]);
+  const [confirmGenerateOpen, setConfirmGenerateOpen] = useState(false);
 
   // New state for input mode
   const [inputMode, setInputMode] = useState<'list' | 'paragraph'>('list');
@@ -143,28 +144,39 @@ export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
     setError(null);
   };
 
-  const handleGenerate = async () => {
+  const handleCheckCache = () => {
     const normalized = vocabList.map((word) => word.trim()).filter(Boolean);
-
     if (normalized.length < 3) {
       setError('Please enter at least 3 vocabulary words.');
       return;
     }
-
-    if (normalized.length > 50) {
-      setError('Please enter no more than 50 vocabulary words.');
-      return;
-    }
-
-    // If cache exists, ask the user what they want
     const cached = getCachedResult(normalized);
     if (cached) {
       setPendingWords(normalized);
       setCacheDialogOpen(true);
+    } else {
+      setError('No cached data found for this word list.');
+    }
+  };
+
+  const handleGenerate = () => {
+    const normalized = vocabList.map((word) => word.trim()).filter(Boolean);
+    if (normalized.length < 3) {
+      setError('Please enter at least 3 vocabulary words.');
       return;
     }
+    if (normalized.length > 50) {
+      setError('Please enter no more than 50 vocabulary words.');
+      return;
+    }
+    setPendingWords(normalized);
+    setConfirmGenerateOpen(true);
+  };
 
-    await runGenerate(normalized);
+  const handleConfirmGenerate = async () => {
+    setConfirmGenerateOpen(false);
+    await runGenerate(pendingWords);
+    setPendingWords([]);
   };
 
   const handleUseCached = () => {
@@ -177,11 +189,7 @@ export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
     setPendingWords([]);
   };
 
-  const handleGenerateFresh = async () => {
-    setCacheDialogOpen(false);
-    await runGenerate(pendingWords);
-    setPendingWords([]);
-  };
+  
 
   const runGenerate = async (normalized: string[]) => {
     setError(null);
@@ -375,8 +383,11 @@ export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
               ))}
             </AnimatePresence>
 
-            <Stack direction="row" spacing={1}>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               <Button variant="outlined" startIcon={<Plus />} onClick={handleAddWord}>Add another word</Button>
+              <Button variant="outlined" color="success" startIcon={<Database className="h-4 w-4" />} disabled={filledCount < 3} onClick={handleCheckCache}>
+                Check &amp; Load Cached
+              </Button>
               <Button variant="contained" startIcon={<Sparkles />} disabled={isGenerating || filledCount < 3} onClick={handleGenerate}>
                 {isGenerating ? 'Generating...' : 'Generate Study Materials'}
               </Button>
@@ -461,36 +472,31 @@ export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
         The maintenance cost is high. Feel free to use this as needed, but please do not spam it.
       </Typography>
 
-      {/* Cache choice dialog */}
-      <Dialog open={cacheDialogOpen} onClose={() => setCacheDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Saved Results Found</DialogTitle>
+      {/* Are you sure? confirmation before generating */}
+      <Dialog open={confirmGenerateOpen} onClose={() => setConfirmGenerateOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Generate Study Materials?</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary">
-            We have cached study materials for this word list. Do you want to load the saved results instantly, or generate a fresh set from the AI?
+            This will call the Gemini AI to generate new flashcards, quizzes, and practice materials for your {pendingWords.length} words. This uses your API quota.
           </Typography>
-          <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-            <Chip icon={<Database className="h-4 w-4" />} label="Instant" color="success" variant="outlined" size="small" />
-            <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>vs</Typography>
-            <Chip icon={<RefreshCw className="h-4 w-4" />} label="New AI content" color="primary" variant="outlined" size="small" />
-          </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<Database className="h-4 w-4" />}
-            onClick={handleUseCached}
-            fullWidth
-          >
-            Load Cached
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<RefreshCw className="h-4 w-4" />}
-            onClick={handleGenerateFresh}
-            fullWidth
-          >
-            Generate Fresh
-          </Button>
+          <Button variant="outlined" onClick={() => setConfirmGenerateOpen(false)} fullWidth>Cancel</Button>
+          <Button variant="contained" startIcon={<Sparkles />} onClick={handleConfirmGenerate} fullWidth>Yes, Generate</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Load cached data dialog */}
+      <Dialog open={cacheDialogOpen} onClose={() => setCacheDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Cached Results Found</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            Saved study materials were found for this word list. Load them instantly?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button variant="outlined" onClick={() => setCacheDialogOpen(false)} fullWidth>Cancel</Button>
+          <Button variant="contained" color="success" startIcon={<Database className="h-4 w-4" />} onClick={handleUseCached} fullWidth>Load Cached</Button>
         </DialogActions>
       </Dialog>
     </Box>
