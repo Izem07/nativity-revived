@@ -70,7 +70,7 @@ export const generateQuizContent = async (vocabularyList: string[]): Promise<Qui
   try {
     const API_KEY = getAPIKey();
     const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
 
     const vocabString = vocabularyList.join(', ');
 
@@ -191,7 +191,7 @@ export const testAPIKey = async () => {
   try {
     const API_KEY = getAPIKey();
     const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
     const result = await model.generateContent('Hello');
     return result.response.text() !== '';
   } catch {
@@ -214,7 +214,7 @@ export const generateMoreQuizQuestions = async (
   try {
     const API_KEY = getAPIKey();
     const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
 
     const vocabString = vocabularyList.join(', ');
 
@@ -268,7 +268,7 @@ export const generateMoreParagraph = async (
   try {
     const API_KEY = getAPIKey();
     const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
 
     const vocabString = vocabularyList.join(', ');
 
@@ -325,7 +325,7 @@ export const generateHangmanWords = async (
   try {
     const API_KEY = getAPIKey();
     const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
 
     let prompt = '';
     if (difficulty === 'custom') {
