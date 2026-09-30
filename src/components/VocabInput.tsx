@@ -46,6 +46,31 @@ const PRE_FILLED_LISTS = [
       'Ubiquitous',
     ],
   },
+  {
+    label: 'Vocab List 2 (20 Words)',
+    words: [
+      'Candid',
+      'Inevitable',
+      'Lethargy',
+      'Morose',
+      'Novice',
+      'Obscure',
+      'Ostentatious',
+      'Precocious',
+      'Prevaricate',
+      'Querulous',
+      'Quiescent',
+      'Repose',
+      'Repudiate',
+      'Soporific',
+      'Spontaneous',
+      'Squander',
+      'Theoretical',
+      'Virulent',
+      'Satire',
+      'Parody',
+    ],
+  },
 ] as const;
 
 export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
