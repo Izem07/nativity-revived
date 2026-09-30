@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Plus, Sparkles, KeyRound, X, ShieldCheck, ClipboardPaste, Info } from 'lucide-react';
+import { Plus, Sparkles, KeyRound, X, ShieldCheck, ClipboardPaste, Info, RefreshCw, Database } from 'lucide-react';
 import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
@@ -11,6 +11,10 @@ import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 
 import { generateQuizContent, QuizGenerationResult } from '../services/geminiService';
 import { getCachedResult, setCachedResult } from '../services/cacheService';
@@ -70,6 +74,8 @@ export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
     }
   };
   const [isGenerating, setIsGenerating] = useState(false);
+  const [cacheDialogOpen, setCacheDialogOpen] = useState(false);
+  const [pendingWords, setPendingWords] = useState<string[]>([]);
 
   // New state for input mode
   const [inputMode, setInputMode] = useState<'list' | 'paragraph'>('list');
@@ -150,20 +156,39 @@ export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
       return;
     }
 
+    // If cache exists, ask the user what they want
+    const cached = getCachedResult(normalized);
+    if (cached) {
+      setPendingWords(normalized);
+      setCacheDialogOpen(true);
+      return;
+    }
+
+    await runGenerate(normalized);
+  };
+
+  const handleUseCached = () => {
+    setCacheDialogOpen(false);
+    const cached = getCachedResult(pendingWords);
+    if (cached) {
+      onGenerate(cached, pendingWords);
+      onLoadingChange(false);
+    }
+    setPendingWords([]);
+  };
+
+  const handleGenerateFresh = async () => {
+    setCacheDialogOpen(false);
+    await runGenerate(pendingWords);
+    setPendingWords([]);
+  };
+
+  const runGenerate = async (normalized: string[]) => {
     setError(null);
     setIsGenerating(true);
     onLoadingChange(true);
 
     try {
-      // Check cache first — same word list reuses saved results
-      const cached = getCachedResult(normalized);
-      if (cached) {
-        onGenerate(cached, normalized);
-        onLoadingChange(false);
-        setIsGenerating(false);
-        return;
-      }
-
       const result = await generateQuizContent(normalized);
       setCachedResult(normalized, result);
       onGenerate(result, normalized);
@@ -435,6 +460,39 @@ export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
         This is a generous service provided by a high school student for high school students.
         The maintenance cost is high. Feel free to use this as needed, but please do not spam it.
       </Typography>
+
+      {/* Cache choice dialog */}
+      <Dialog open={cacheDialogOpen} onClose={() => setCacheDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Saved Results Found</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            We have cached study materials for this word list. Do you want to load the saved results instantly, or generate a fresh set from the AI?
+          </Typography>
+          <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+            <Chip icon={<Database className="h-4 w-4" />} label="Instant" color="success" variant="outlined" size="small" />
+            <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>vs</Typography>
+            <Chip icon={<RefreshCw className="h-4 w-4" />} label="New AI content" color="primary" variant="outlined" size="small" />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<Database className="h-4 w-4" />}
+            onClick={handleUseCached}
+            fullWidth
+          >
+            Load Cached
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<RefreshCw className="h-4 w-4" />}
+            onClick={handleGenerateFresh}
+            fullWidth
+          >
+            Generate Fresh
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
