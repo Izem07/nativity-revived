@@ -13,6 +13,7 @@ import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 
 import { generateQuizContent, QuizGenerationResult } from '../services/geminiService';
+import { getCachedResult, setCachedResult } from '../services/cacheService';
 
 interface VocabInputProps {
   onGenerate: (result: QuizGenerationResult, vocabList: string[]) => void;
@@ -154,7 +155,17 @@ export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
     onLoadingChange(true);
 
     try {
+      // Check cache first — same word list reuses saved results
+      const cached = getCachedResult(normalized);
+      if (cached) {
+        onGenerate(cached, normalized);
+        onLoadingChange(false);
+        setIsGenerating(false);
+        return;
+      }
+
       const result = await generateQuizContent(normalized);
+      setCachedResult(normalized, result);
       onGenerate(result, normalized);
     } catch (generateError) {
       setError(
