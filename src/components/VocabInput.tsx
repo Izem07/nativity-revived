@@ -55,6 +55,19 @@ export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
   const [error, setError] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('GEMINI_API_KEY') ?? '');
   const [showApiPanel, setShowApiPanel] = useState(false);
+  const [apiKeySaved, setApiKeySaved] = useState(false);
+
+  const handleApiKeyChange = (value: string) => {
+    setApiKey(value);
+    setApiKeySaved(false);
+  };
+
+  const handleSaveApiKey = () => {
+    if (apiKey.trim()) {
+      localStorage.setItem('GEMINI_API_KEY', apiKey.trim());
+      setApiKeySaved(true);
+    }
+  };
   const [isGenerating, setIsGenerating] = useState(false);
 
   // New state for input mode
@@ -141,10 +154,6 @@ export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
     onLoadingChange(true);
 
     try {
-      if (apiKey.trim()) {
-        localStorage.setItem('GEMINI_API_KEY', apiKey.trim());
-      }
-
       const result = await generateQuizContent(normalized);
       onGenerate(result, normalized);
     } catch (generateError) {
@@ -361,15 +370,25 @@ export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
               id="api-key"
               type="password"
               value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
-              placeholder="Enter your API key or leave blank to use the shared key"
+              onChange={(event) => handleApiKeyChange(event.target.value)}
+              placeholder="Enter your API key (starts with AIza...)"
               variant="outlined"
               size="small"
               fullWidth
               sx={{ mt: 1 }}
             />
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+              <Button variant="contained" size="small" onClick={handleSaveApiKey} disabled={!apiKey.trim()}>
+                Save Key
+              </Button>
+              {apiKeySaved && (
+                <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>
+                  ✓ Key saved!
+                </Typography>
+              )}
+            </Stack>
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              Retrieve a free key at <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noreferrer">Google AI Studio</a>.
+              Get a free key (no billing needed) at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">Google AI Studio</a>. Keys start with <strong>AIza</strong>.
             </Typography>
           </Paper>
         </Collapse>

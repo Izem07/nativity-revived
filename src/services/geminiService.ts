@@ -180,6 +180,9 @@ export const generateQuizContent = async (vocabularyList: string[]): Promise<Qui
     };
   } catch (error) {
     console.error('Error generating content:', error);
+    if (error instanceof Error) {
+      throw error;
+    }
     throw new Error('Failed to generate quiz content. Please check your API key and try again.');
   }
 };
