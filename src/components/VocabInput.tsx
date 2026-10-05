@@ -29,7 +29,7 @@ const WORD_NUMBER_BADGE_BASE_WIDTH = 28;
 const WORD_NUMBER_BADGE_WIDTH_PER_DIGIT = 8;
 const PRE_FILLED_LISTS = [
   {
-    label: 'Vocab List 2 (20 Words)',
+    label: 'Vocab List 2 (18 Words)',
     words: [
       'Candid',
       'Inevitable',
@@ -49,8 +49,6 @@ const PRE_FILLED_LISTS = [
       'Squander',
       'Theoretical',
       'Virulent',
-      'Satire',
-      'Parody',
     ],
   },
 ] as const;
