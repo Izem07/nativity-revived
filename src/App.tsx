@@ -10,7 +10,8 @@ import {
   Sparkles,
   RotateCcw,
   BookMarked,
-  KeyRound
+  KeyRound,
+  Scroll
 } from 'lucide-react';
 import SplashScreen from './components/SplashScreen';
 import { Flashcards } from './components/Flashcards';
@@ -25,9 +26,10 @@ import { RhetoricalFlashcards } from './components/RhetoricalFlashcards';
 import { RhetoricalQuiz } from './components/RhetoricalQuiz';
 import { RhetoricalSentenceGame } from './components/RhetoricalSentenceGame';
 import { RhetoricalPassagePractice } from './components/RhetoricalPassagePractice';
+import { PassageStudy } from './components/PassageStudy';
 import { ApiKeyModal } from './components/ApiKeyModal';
 
-type StudySubject = 'vocab' | 'rhetoric';
+type StudySubject = 'vocab' | 'rhetoric' | 'passage';
 type VocabLearningMode = 'input' | 'flashcards' | 'quiz' | 'matching' | 'paragraph';
 type RhetoricalLearningMode = 'input' | 'flashcards' | 'quiz' | 'sentence-game' | 'passage';
 
@@ -80,22 +82,32 @@ function App() {
     return <SplashScreen onComplete={() => setShowSplash(false)} />;
   }
 
+  const isVocab = subject === 'vocab';
   const isRhetoric = subject === 'rhetoric';
+  const isPassage = subject === 'passage';
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-950 text-white transition-colors duration-700">
       {/* Dynamic Background Glow Orbs */}
       <div className="pointer-events-none absolute inset-0 transition-opacity duration-700">
-        {!isRhetoric ? (
+        {isVocab && (
           <>
             <div className="absolute inset-y-0 left-[-10%] h-[140%] w-[45%] rounded-full bg-brand-500/20 blur-3xl" />
             <div className="absolute right-[-20%] top-[-10%] h-[120%] w-[50%] rounded-full bg-cyan-400/20 blur-3xl" />
           </>
-        ) : (
+        )}
+        {isRhetoric && (
           <>
             <div className="absolute inset-y-0 left-[-10%] h-[140%] w-[45%] rounded-full bg-emerald-500/20 blur-3xl" />
             <div className="absolute right-[-20%] top-[-10%] h-[120%] w-[50%] rounded-full bg-teal-400/20 blur-3xl" />
             <div className="absolute left-[30%] top-[-5%] h-[80%] w-[40%] rounded-full bg-amber-400/10 blur-3xl" />
+          </>
+        )}
+        {isPassage && (
+          <>
+            <div className="absolute inset-y-0 left-[-10%] h-[140%] w-[45%] rounded-full bg-amber-500/25 blur-3xl" />
+            <div className="absolute right-[-20%] top-[-10%] h-[120%] w-[50%] rounded-full bg-yellow-400/20 blur-3xl" />
+            <div className="absolute left-[25%] top-[10%] h-[70%] w-[50%] rounded-full bg-amber-600/15 blur-3xl" />
           </>
         )}
         <div className="absolute inset-x-0 bottom-[-20%] h-[60%] bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" />
@@ -108,12 +120,16 @@ function App() {
             <div className="flex items-center gap-2.5">
               <div
                 className={`p-2 rounded-xl transition-all duration-300 ${
-                  isRhetoric
+                  isPassage
+                    ? 'bg-gradient-to-br from-amber-400/20 to-yellow-500/20 border border-amber-400/30'
+                    : isRhetoric
                     ? 'bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30'
                     : 'bg-gradient-to-br from-brand-500/20 to-cyan-500/20 border border-brand-500/30'
                 }`}
               >
-                {isRhetoric ? (
+                {isPassage ? (
+                  <Scroll className="h-5 w-5 text-amber-300" />
+                ) : isRhetoric ? (
                   <Feather className="h-5 w-5 text-emerald-400" />
                 ) : (
                   <BookMarked className="h-5 w-5 text-cyan-400" />
@@ -127,7 +143,11 @@ function App() {
                   </span>
                 </h1>
                 <p className="text-[10px] text-slate-400">
-                  {isRhetoric ? 'Rhetorical Devices & Sentence Matching' : 'Comprehensive Vocabulary Suite'}
+                  {isPassage
+                    ? 'AP Lang Passage Analysis & SOAPSTone'
+                    : isRhetoric
+                    ? 'Rhetorical Devices & Sentence Matching'
+                    : 'Comprehensive Vocabulary Suite'}
                 </p>
               </div>
             </div>
@@ -135,11 +155,11 @@ function App() {
             {/* Actions: Subject Switcher + API Key Pill */}
             <div className="flex items-center gap-2 flex-wrap justify-center">
               {/* Subject Toggle Switch */}
-              <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-900/90 border border-white/10 shadow-inner">
+              <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-900/90 border border-white/10 shadow-inner">
                 <button
                   onClick={() => setSubject('vocab')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    !isRhetoric
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    isVocab
                       ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-indigo-500/20 scale-[1.02]'
                       : 'text-slate-400 hover:text-white hover:bg-white/5'
                   }`}
@@ -150,7 +170,7 @@ function App() {
 
                 <button
                   onClick={() => setSubject('rhetoric')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                     isRhetoric
                       ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-500/20 scale-[1.02]'
                       : 'text-slate-400 hover:text-white hover:bg-white/5'
@@ -158,6 +178,18 @@ function App() {
                 >
                   <Feather className="h-3.5 w-3.5 text-emerald-300" />
                   Rhetorical Terms
+                </button>
+
+                <button
+                  onClick={() => setSubject('passage')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    isPassage
+                      ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-lg shadow-amber-500/20 scale-[1.02]'
+                      : 'text-slate-400 hover:text-amber-200 hover:bg-white/5'
+                  }`}
+                >
+                  <Scroll className="h-3.5 w-3.5 text-amber-300" />
+                  Passage Study
                 </button>
               </div>
 
@@ -188,14 +220,22 @@ function App() {
             <div className="absolute inset-0 z-40 flex items-center justify-center bg-slate-950/75 backdrop-blur-md">
               <motion.div
                 className={`flex h-24 w-24 flex-col items-center justify-center rounded-3xl border ${
-                  isRhetoric ? 'border-emerald-500/30 bg-emerald-950/30' : 'border-white/20 bg-white/10'
+                  isPassage
+                    ? 'border-amber-500/40 bg-amber-950/30'
+                    : isRhetoric
+                    ? 'border-emerald-500/30 bg-emerald-950/30'
+                    : 'border-white/20 bg-white/10'
                 }`}
                 animate={{ rotate: 360 }}
                 transition={{ repeat: Infinity, duration: 2, ease: 'linear' }}
               >
                 <motion.span
                   className={`h-12 w-12 rounded-full border-2 border-transparent ${
-                    isRhetoric ? 'border-t-emerald-400' : 'border-t-cyan-400'
+                    isPassage
+                      ? 'border-t-amber-400'
+                      : isRhetoric
+                      ? 'border-t-emerald-400'
+                      : 'border-t-cyan-400'
                   }`}
                   animate={{ rotate: -360 }}
                   transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }}
@@ -208,7 +248,7 @@ function App() {
             {/* ========================================================= */}
             {/* SECTION 1: VOCABULARY MODE                               */}
             {/* ========================================================= */}
-            {!isRhetoric && (
+            {isVocab && (
               <>
                 {hasVocabContent && (
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 max-w-3xl mx-auto w-full">
@@ -355,6 +395,22 @@ function App() {
                 </div>
               </>
             )}
+
+            {/* ========================================================= */}
+            {/* SECTION 3: AP LANG PASSAGE STUDY MODE (GOLDEN NATIVITY)    */}
+            {/* ========================================================= */}
+            {isPassage && (
+              <div className="relative">
+                <div className="absolute inset-0 rounded-3xl bg-amber-500/5 blur-3xl" />
+                <div className="relative">
+                  <PassageStudy
+                    activeRhetoricalTerms={rhetoricalTermsList}
+                    activeVocabularyWords={vocabularyList}
+                    onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </main>
 
@@ -368,7 +424,7 @@ function App() {
         </footer>
       </div>
 
-      {/* Global Unified API Key Collection Modal */}
+      {/* Global Unified API Key Collection Modal with Key Pooling */}
       <ApiKeyModal
         isOpen={isApiKeyModalOpen}
         onClose={() => setIsApiKeyModalOpen(false)}
