@@ -1,21 +1,18 @@
 import React, { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Plus, Sparkles, KeyRound, X, ShieldCheck, ClipboardPaste, Info, Database } from 'lucide-react';
-import TextField from '@mui/material/TextField';
-import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
-import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import Typography from '@mui/material/Typography';
-import Chip from '@mui/material/Chip';
-import Collapse from '@mui/material/Collapse';
-import Alert from '@mui/material/Alert';
-import Stack from '@mui/material/Stack';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-
+import {
+  Plus,
+  Sparkles,
+  KeyRound,
+  X,
+  ShieldCheck,
+  ClipboardPaste,
+  Info,
+  Database,
+  BookOpen,
+  ArrowRight,
+  Layers
+} from 'lucide-react';
 import { generateQuizContent, QuizGenerationResult, getStoredAPIKey } from '../services/geminiService';
 import { getCachedResult, setCachedResult } from '../services/cacheService';
 
@@ -25,9 +22,6 @@ interface VocabInputProps {
   onOpenApiKeyModal?: () => void;
 }
 
-const MIN_WORD_NUMBER_DIGITS = 2;
-const WORD_NUMBER_BADGE_BASE_WIDTH = 28;
-const WORD_NUMBER_BADGE_WIDTH_PER_DIGIT = 8;
 const PRE_FILLED_LISTS = [
   {
     label: 'Vocab List 2 (18 Words)',
@@ -57,35 +51,15 @@ const PRE_FILLED_LISTS = [
 export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: VocabInputProps) {
   const [vocabList, setVocabList] = useState<string[]>(['']);
   const [error, setError] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('GEMINI_API_KEY') ?? '');
-  const [showApiPanel, setShowApiPanel] = useState(false);
-  const [apiKeySaved, setApiKeySaved] = useState(false);
-
-  const handleApiKeyChange = (value: string) => {
-    setApiKey(value);
-    setApiKeySaved(false);
-  };
-
-  const handleSaveApiKey = () => {
-    if (apiKey.trim()) {
-      localStorage.setItem('GEMINI_API_KEY', apiKey.trim());
-      setApiKeySaved(true);
-    }
-  };
   const [isGenerating, setIsGenerating] = useState(false);
   const [cacheDialogOpen, setCacheDialogOpen] = useState(false);
   const [pendingWords, setPendingWords] = useState<string[]>([]);
   const [confirmGenerateOpen, setConfirmGenerateOpen] = useState(false);
 
-  // New state for input mode
   const [inputMode, setInputMode] = useState<'list' | 'paragraph'>('list');
   const [paragraphText, setParagraphText] = useState('');
 
   const filledCount = useMemo(() => vocabList.filter((word) => word.trim() !== '').length, [vocabList]);
-  const wordNumberDigits = Math.max(MIN_WORD_NUMBER_DIGITS, String(Math.max(vocabList.length, 1)).length);
-  const wordNumberMinWidth = WORD_NUMBER_BADGE_BASE_WIDTH + wordNumberDigits * WORD_NUMBER_BADGE_WIDTH_PER_DIGIT;
-
-  const formatWordNumber = (position: number) => String(position).padStart(wordNumberDigits, '0');
 
   const handleAddWord = () => setVocabList((prev) => [...prev, '']);
 
@@ -119,17 +93,13 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
 
   const handleProcessParagraph = () => {
     if (!paragraphText.trim()) return;
-
-    // Split by common delimiters: commas, newlines, periods, semicolons
     const words = paragraphText
       .split(/[,\n.;]+/)
       .map((word) => word.trim())
       .filter((word) => word.length > 0);
 
     if (words.length > 0) {
-      // Limit to 50 words
-      const limitedWords = words.slice(0, 50);
-      setVocabList(limitedWords);
+      setVocabList(words.slice(0, 50));
       setInputMode('list');
       setParagraphText('');
       setError(null);
@@ -145,43 +115,37 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
 
   const handleCheckCache = () => {
     const normalized = vocabList.map((word) => word.trim()).filter(Boolean);
-    if (normalized.length < 3) {
-      setError('Please enter at least 3 vocabulary words.');
-      return;
-    }
-    const cached = getCachedResult(normalized);
+    // If specific words entered, check for them; otherwise check if ANY cached vocab set exists
+    const cached = getCachedResult(normalized.length >= 3 ? normalized : undefined);
     if (cached) {
-      setPendingWords(normalized);
-      setCacheDialogOpen(true);
+      onGenerate(cached.data, cached.words);
+      onLoadingChange(false);
+      setError(null);
     } else {
-      setError('No cached data found for this word list.');
+      setError('No cached study set found in local storage. Generate one first!');
     }
   };
 
-  const handleGenerate = () => {
+  const handleGenerateClick = () => {
     const normalized = vocabList.map((word) => word.trim()).filter(Boolean);
     if (normalized.length < 3) {
-      setError('Please enter at least 3 vocabulary words.');
+      setError('Please provide at least 3 vocabulary words.');
       return;
     }
-    if (normalized.length > 50) {
-      setError('Please enter no more than 50 vocabulary words.');
+    // Check if this exact list already has cached data to save API credits
+    const cached = getCachedResult(normalized);
+    if (cached) {
+      onGenerate(cached.data, normalized);
+      onLoadingChange(false);
       return;
-    }
-    if (!getStoredAPIKey()) {
-      if (onOpenApiKeyModal) {
-        onOpenApiKeyModal();
-        return;
-      }
     }
     setPendingWords(normalized);
     setConfirmGenerateOpen(true);
   };
 
-  const handleConfirmGenerate = async () => {
+  const handleConfirmGenerate = () => {
     setConfirmGenerateOpen(false);
-    await runGenerate(pendingWords);
-    setPendingWords([]);
+    runGenerate(pendingWords);
   };
 
   const handleUseCached = () => {
@@ -193,8 +157,6 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
     }
     setPendingWords([]);
   };
-
-  
 
   const runGenerate = async (normalized: string[]) => {
     setError(null);
@@ -209,7 +171,7 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
       setError(
         generateError instanceof Error
           ? generateError.message
-          : 'Failed to generate study materials. Please try again.',
+          : 'Failed to generate study materials. Please check your API key.',
       );
       onLoadingChange(false);
     } finally {
@@ -218,255 +180,255 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
   };
 
   return (
-    <Box sx={{ mx: 'auto', width: '100%', maxWidth: 900, display: 'flex', flexDirection: 'column', gap: 3 }}>
-      <motion.header
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{
-          duration: 0.4, ease: 'easeOut'
-        }}
-      >
-        <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ mb: 2 }}>
-          <Chip color="primary" label="AI-Powered Study Companion" icon={<Sparkles className="h-5 w-5" />} sx={{ fontWeight: 700 }} />
-        </Stack>
+    <div className="w-full max-w-4xl mx-auto flex flex-col gap-8">
+      {/* Editorial Header */}
+      <div className="text-center space-y-3">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-brand-500/30 bg-brand-500/10 text-brand-600 dark:text-brand-300 text-xs font-semibold tracking-wide uppercase">
+          <Sparkles className="h-3.5 w-3.5" />
+          <span>Academic Study Engine</span>
+        </div>
+        <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          Vocabulary Master Suite
+        </h2>
+        <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 max-w-xl mx-auto leading-relaxed">
+          Provide 3 to 50 target vocabulary words to generate contextual flashcards, multiple-choice quizzes, interactive games, and analytical synthesis passages.
+        </p>
+      </div>
 
-        <Typography variant="h3" align="center" sx={{ fontWeight: 800, letterSpacing: 2 }}>
-          Enter Your Vocabulary List
-        </Typography>
-
-        <Typography variant="body1" align="center" sx={{ mt: 1, color: 'text.secondary', maxWidth: 720, mx: 'auto' }}>
-          Add <strong>3–50 vocabulary words</strong> and we’ll craft <strong>flashcards, quizzes, matching games</strong>, and <em>paragraph practice</em> tailored to your study goals.
-        </Typography>
-<Alert severity="info" icon={<ShieldCheck className="h-5 w-5" />} sx={{ mt: 2, mx: 'auto', maxWidth: 800, bgcolor: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
-          <Typography variant="caption" sx={{ display: 'block', color: 'text.primary', fontWeight: 500 }}>
-            Created by a high school student for students.
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            This is a generous free service with high maintenance costs. Please use it responsibly and do not spam requests.
-          </Typography>
-        </Alert>
-      </motion.header>
-
-      <Paper elevation={6} sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-          <Box>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-              <Chip icon={<ClipboardPaste className="h-4 w-4" />} label="Quick Entry Supported" variant="outlined" />
-            </Stack>
-            <Typography variant="h6">Vocabulary List</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {inputMode === 'list'
-                ? "Paste a comma-separated list or add words one by one."
-                : "Paste a paragraph of text and we'll extract the words for you."}
-            </Typography>
-          </Box>
-
-          <Box sx={{ textAlign: 'right' }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{filledCount} words added</Typography>
-            <Typography variant="caption" color="text.secondary">Goal: 3-50 words</Typography>
-          </Box>
-        </Box>
-
-        <Box sx={{ mb: 3 }}>
-          <Stack direction="row" spacing={1} justifyContent="center" sx={{ bgcolor: 'action.hover', p: 0.5, borderRadius: 2, display: 'inline-flex' }}>
-            <Button
-              size="small"
-              variant={inputMode === 'list' ? 'contained' : 'text'}
+      {/* Main Workspace Card */}
+      <div className="card-glass rounded-3xl p-6 sm:p-10 relative overflow-hidden transition-all">
+        {/* Top Control Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-6 border-b border-zinc-200 dark:border-white/[0.08]">
+          <div className="flex items-center gap-2">
+            <button
               onClick={() => setInputMode('list')}
-              sx={{ minWidth: 100 }}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all ${
+                inputMode === 'list'
+                  ? 'bg-brand-600 text-white shadow-sm'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 dark:bg-white/[0.04]'
+              }`}
             >
-              List View
-            </Button>
-            <Button
-              size="small"
-              variant={inputMode === 'paragraph' ? 'contained' : 'text'}
+              List Entry
+            </button>
+            <button
               onClick={() => setInputMode('paragraph')}
-              sx={{ minWidth: 100 }}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all ${
+                inputMode === 'paragraph'
+                  ? 'bg-brand-600 text-white shadow-sm'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 dark:bg-white/[0.04]'
+              }`}
             >
-              Paragraph
-            </Button>
-          </Stack>
-        </Box>
+              Extract from Text
+            </button>
+          </div>
 
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+              <strong className="text-zinc-900 dark:text-zinc-100 font-semibold">{filledCount}</strong> words added
+            </span>
+            <span className="text-xs text-zinc-400 dark:text-zinc-500">•</span>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">Goal: 3–50</span>
+          </div>
+        </div>
+
+        {/* Input Mode Content */}
         {inputMode === 'paragraph' ? (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-          >
-            <TextField
-              multiline
+          <div className="space-y-4">
+            <textarea
               rows={8}
-              fullWidth
-              placeholder="Paste your paragraph here. We'll automatically separate the words..."
               value={paragraphText}
               onChange={(e) => setParagraphText(e.target.value)}
-              variant="outlined"
-              sx={{ mb: 2 }}
+              placeholder="Paste reading passages, study guides, or teacher notes here. Words will be parsed automatically..."
+              className="w-full p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-white/[0.08] text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all font-mono"
             />
-            <Button
-              fullWidth
-              variant="contained"
+            <button
               onClick={handleProcessParagraph}
               disabled={!paragraphText.trim()}
-              startIcon={<Sparkles />}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-semibold text-xs uppercase tracking-wider transition-all disabled:opacity-40"
             >
-              Extract Words from Paragraph
-            </Button>
-          </motion.div>
+              <Sparkles className="h-4 w-4" />
+              <span>Parse Vocabulary From Text</span>
+            </button>
+          </div>
         ) : (
-          <Stack spacing={2}>
-            <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Pre-filled
-              </Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <div className="space-y-6">
+            {/* Presets */}
+            <div>
+              <span className="text-[11px] font-mono tracking-wider uppercase text-zinc-500 dark:text-zinc-400 block mb-2 font-semibold">
+                Course Presets
+              </span>
+              <div className="flex flex-wrap gap-2">
                 {PRE_FILLED_LISTS.map((preset) => (
-                  <Chip
+                  <button
                     key={preset.label}
-                    label={preset.label}
-                    clickable
-                    color="primary"
-                    variant="outlined"
                     onClick={() => handleApplyPreFilledList(preset.words)}
-                  />
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-medium border border-brand-500/30 bg-brand-500/10 text-brand-700 dark:text-brand-300 hover:bg-brand-500/20 transition-all"
+                  >
+                    {preset.label}
+                  </button>
                 ))}
-              </Stack>
-            </Box>
-            <AnimatePresence initial={false}>
-              {vocabList.map((word, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.18, ease: 'easeOut' }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Chip
-                      label={formatWordNumber(index + 1)}
-                      color="secondary"
-                      sx={{
-                        minWidth: wordNumberMinWidth,
-                        fontVariantNumeric: 'tabular-nums',
-                        '& .MuiChip-label': {
-                          px: 1,
-                        },
-                      }}
-                    />
-                    <TextField
+              </div>
+            </div>
+
+            {/* Word Grid Inputs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[380px] overflow-y-auto pr-1">
+              <AnimatePresence initial={false}>
+                {vocabList.map((word, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex items-center gap-2 group"
+                  >
+                    <span className="h-9 w-9 flex-shrink-0 rounded-xl bg-zinc-100 dark:bg-white/[0.05] border border-zinc-200 dark:border-white/[0.08] flex items-center justify-center font-mono text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <input
+                      type="text"
                       value={word}
-                      onChange={(event) => handleWordChange(index, event.target.value)}
+                      onChange={(e) => handleWordChange(index, e.target.value)}
                       onPaste={index === 0 ? handlePaste : undefined}
-                      placeholder="Enter vocabulary word"
-                      variant="outlined"
-                      fullWidth
-                      size="small"
-                      inputProps={{ 'aria-label': `vocab-${index}` }}
+                      placeholder={index === 0 ? 'Type or paste word list...' : 'Vocabulary word'}
+                      className="flex-1 px-3.5 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-white/[0.08] text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition-all font-medium"
                     />
                     {vocabList.length > 1 && (
-                      <IconButton aria-label="remove" onClick={() => handleRemoveWord(index)}>
-                        <X />
-                      </IconButton>
+                      <button
+                        onClick={() => handleRemoveWord(index)}
+                        className="p-2 rounded-xl text-zinc-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                        title="Remove word"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     )}
-                  </Box>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
 
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-              <Button variant="outlined" startIcon={<Plus />} onClick={handleAddWord}>Add another word</Button>
-              <Button variant="outlined" color="success" startIcon={<Database className="h-4 w-4" />} disabled={filledCount < 3} onClick={handleCheckCache}>
-                Check &amp; Load Cached
-              </Button>
-              <Button variant="contained" startIcon={<Sparkles />} disabled={isGenerating || filledCount < 3} onClick={handleGenerate}>
-                {isGenerating ? 'Generating...' : 'Generate Study Materials'}
-              </Button>
-              <Chip icon={<Info />} label="Paste 10+ words at once" />
-            </Stack>
-          </Stack>
+            {/* Bottom Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-zinc-200 dark:border-white/[0.08]">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleAddWord}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-zinc-100 dark:bg-white/[0.03] hover:bg-zinc-200 dark:hover:bg-white/[0.06] text-zinc-700 dark:text-zinc-300 text-xs font-semibold tracking-wide transition-all"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add Word</span>
+                </button>
+                <button
+                  onClick={handleCheckCache}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-semibold tracking-wide transition-all"
+                  title="Load any previously stored vocabulary study set without using API credits"
+                >
+                  <Database className="h-3.5 w-3.5" />
+                  <span>Load Cached Set</span>
+                </button>
+              </div>
+
+              <button
+                onClick={handleGenerateClick}
+                disabled={isGenerating || filledCount < 3}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 via-indigo-600 to-sky-600 text-white font-semibold text-xs tracking-wide uppercase shadow-md shadow-brand-500/25 hover:shadow-brand-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40"
+              >
+                <Sparkles className="h-4 w-4" />
+                <span>{isGenerating ? 'Synthesizing...' : 'Generate Study Materials'}</span>
+              </button>
+            </div>
+          </div>
         )}
 
-        <Paper variant="outlined" sx={{ p: 2, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 3 }}>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <ShieldCheck className="h-5 w-5 text-emerald-500" />
-            <Box>
-              <Typography variant="subtitle2">Privacy respectful</Typography>
-              <Typography variant="body2" color="text.secondary">Your API key stays on your device and is stored locally when provided.</Typography>
-            </Box>
-          </Box>
-
-          <Button
-            variant="outlined"
-            startIcon={<KeyRound />}
-            onClick={onOpenApiKeyModal}
-            color={getStoredAPIKey() ? 'success' : 'primary'}
-          >
-            {getStoredAPIKey() ? '✓ Gemini API Key Configured' : 'Connect Gemini API Key (Free)'}
-          </Button>
-        </Paper>
-
-        <Paper variant="outlined" sx={{ p: 2, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
-          <Box>
-            <Typography variant="overline">Tips</Typography>
-            <ul>
-              <li>Use specific vocabulary sets you want to master this week.</li>
-              <li>Ensure each word is spelled correctly for accurate AI responses.</li>
-              <li>Revisit generated materials regularly to reinforce retention.</li>
-            </ul>
-          </Box>
-          <Box>
-            <Typography variant="overline">What you'll receive</Typography>
-            <ul>
-              <li>Interactive flashcards with definitions and usage examples.</li>
-              <li>Auto-graded quizzes with instant feedback.</li>
-              <li>Matching games and paragraph practice for deeper context.</li>
-            </ul>
-          </Box>
-        </Paper>
-
+        {/* Error Alert */}
         {error && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>
-          </motion.div>
+          <div className="mt-6 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="text-rose-500 hover:text-rose-700">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         )}
-      </Paper>
 
-      <Typography variant="caption" align="center" sx={{ display: 'block', color: 'text.secondary', opacity: 0.7, maxWidth: 600, mx: 'auto', pb: 4 }}>
-        This app is created and developed by a single developer. Please do not spam the app.
-        This is a generous service provided by a high school student for high school students.
-        The maintenance cost is high. Feel free to use this as needed, but please do not spam it.
-      </Typography>
+        {/* Bottom Feature Badges */}
+        <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-white/[0.08] grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex items-start gap-3 p-4 rounded-2xl bg-zinc-50 dark:bg-white/[0.02] border border-zinc-200 dark:border-white/[0.06]">
+            <ShieldCheck className="h-5 w-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">Private & Local Storage</h4>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                API credentials and generated flashcards remain encrypted strictly within your browser.
+              </p>
+            </div>
+          </div>
 
-      {/* Are you sure? confirmation before generating */}
-      <Dialog open={confirmGenerateOpen} onClose={() => setConfirmGenerateOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Generate Study Materials?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
-            This will call the Gemini AI to generate new flashcards, quizzes, and practice materials for your {pendingWords.length} words. This uses your API quota.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-          <Button variant="outlined" onClick={() => setConfirmGenerateOpen(false)} fullWidth>Cancel</Button>
-          <Button variant="contained" startIcon={<Sparkles />} onClick={handleConfirmGenerate} fullWidth>Yes, Generate</Button>
-        </DialogActions>
-      </Dialog>
+          <div className="flex items-center justify-between p-4 rounded-2xl bg-zinc-50 dark:bg-white/[0.02] border border-zinc-200 dark:border-white/[0.06]">
+            <div>
+              <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">Gemini Key Management</h4>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                {getStoredAPIKey() ? 'Key pool active & connected' : 'Connect free Gemini API key'}
+              </p>
+            </div>
+            <button
+              onClick={onOpenApiKeyModal}
+              className="px-3.5 py-1.5 rounded-xl border border-zinc-300 dark:border-white/[0.1] bg-white dark:bg-white/[0.05] text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:border-brand-500 transition-colors"
+            >
+              Configure
+            </button>
+          </div>
+        </div>
+      </div>
 
-      {/* Load cached data dialog */}
-      <Dialog open={cacheDialogOpen} onClose={() => setCacheDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Cached Results Found</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
-            Saved study materials were found for this word list. Load them instantly?
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-          <Button variant="outlined" onClick={() => setCacheDialogOpen(false)} fullWidth>Cancel</Button>
-          <Button variant="contained" color="success" startIcon={<Database className="h-4 w-4" />} onClick={handleUseCached} fullWidth>Load Cached</Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+      {/* Confirmation Modal */}
+      {confirmGenerateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-md">
+          <div className="card-glass rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-luxury">
+            <h3 className="font-serif text-lg font-semibold text-zinc-900 dark:text-zinc-50">Generate Study Materials?</h3>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              This queries Gemini AI to generate flashcards, quizzes, games, and analytical paragraph context for {pendingWords.length} words.
+            </p>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setConfirmGenerateOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-zinc-200 dark:border-white/[0.1] text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/[0.05] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmGenerate}
+                className="flex-1 py-2.5 rounded-xl bg-brand-600 text-white text-xs font-semibold hover:bg-brand-500 transition-colors"
+              >
+                Generate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cache Dialog Modal */}
+      {cacheDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-md">
+          <div className="card-glass rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-luxury">
+            <h3 className="font-serif text-lg font-semibold text-zinc-900 dark:text-zinc-50">Saved Study Set Found</h3>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              Cached study materials already exist for this exact word list. Load them immediately without using API quota?
+            </p>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setCacheDialogOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-zinc-200 dark:border-white/[0.1] text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/[0.05] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUseCached}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 transition-colors"
+              >
+                Load Cached
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
-
-// End of file

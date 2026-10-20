@@ -11,7 +11,10 @@ import {
   RotateCcw,
   BookMarked,
   KeyRound,
-  Scroll
+  Scroll,
+  Layers,
+  Sun,
+  Moon
 } from 'lucide-react';
 import SplashScreen from './components/SplashScreen';
 import { Flashcards } from './components/Flashcards';
@@ -27,15 +30,19 @@ import { RhetoricalQuiz } from './components/RhetoricalQuiz';
 import { RhetoricalSentenceGame } from './components/RhetoricalSentenceGame';
 import { RhetoricalPassagePractice } from './components/RhetoricalPassagePractice';
 import { PassageStudy } from './components/PassageStudy';
+import { AnalogyQuiz } from './components/AnalogyQuiz';
 import { ApiKeyModal } from './components/ApiKeyModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { useTheme } from './theme/ThemeProvider';
 
-type StudySubject = 'vocab' | 'rhetoric' | 'passage';
+type StudySubject = 'vocab' | 'analogy' | 'rhetoric' | 'passage';
 type VocabLearningMode = 'input' | 'flashcards' | 'quiz' | 'matching' | 'paragraph';
 type RhetoricalLearningMode = 'input' | 'flashcards' | 'quiz' | 'sentence-game' | 'passage';
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [subject, setSubject] = useState<StudySubject>('vocab');
+  const { resolvedTheme, setTheme } = useTheme();
 
   // API Key State
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
@@ -83,168 +90,212 @@ function App() {
   }
 
   const isVocab = subject === 'vocab';
+  const isAnalogy = subject === 'analogy';
   const isRhetoric = subject === 'rhetoric';
   const isPassage = subject === 'passage';
+  const isDark = resolvedTheme === 'dark';
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-white transition-colors duration-700">
-      {/* Dynamic Background Glow Orbs */}
-      <div className="pointer-events-none absolute inset-0 transition-opacity duration-700">
+    <div className="relative min-h-screen overflow-x-hidden bg-[var(--bg-page)] text-[var(--text-primary)] antialiased font-sans selection:bg-brand-500/30 transition-colors duration-300">
+      {/* Background Micro-Noise Grid */}
+      <div className="pointer-events-none fixed inset-0 bg-noise opacity-30 z-0" />
+
+      {/* Atmospheric Ambient Glows */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden z-0 transition-opacity duration-1000">
         {isVocab && (
           <>
-            <div className="absolute inset-y-0 left-[-10%] h-[140%] w-[45%] rounded-full bg-brand-500/20 blur-3xl" />
-            <div className="absolute right-[-20%] top-[-10%] h-[120%] w-[50%] rounded-full bg-cyan-400/20 blur-3xl" />
+            <div className={`absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full ${isDark ? 'bg-brand-600/15' : 'bg-brand-400/10'} blur-[140px]`} />
+            <div className={`absolute top-1/4 -right-40 h-[500px] w-[500px] rounded-full ${isDark ? 'bg-sky-500/10' : 'bg-sky-300/10'} blur-[140px]`} />
+          </>
+        )}
+        {isAnalogy && (
+          <>
+            <div className={`absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full ${isDark ? 'bg-violet-600/20' : 'bg-violet-400/10'} blur-[140px]`} />
+            <div className={`absolute top-1/3 -right-40 h-[500px] w-[500px] rounded-full ${isDark ? 'bg-fuchsia-500/15' : 'bg-fuchsia-300/10'} blur-[140px]`} />
           </>
         )}
         {isRhetoric && (
           <>
-            <div className="absolute inset-y-0 left-[-10%] h-[140%] w-[45%] rounded-full bg-emerald-500/20 blur-3xl" />
-            <div className="absolute right-[-20%] top-[-10%] h-[120%] w-[50%] rounded-full bg-teal-400/20 blur-3xl" />
-            <div className="absolute left-[30%] top-[-5%] h-[80%] w-[40%] rounded-full bg-amber-400/10 blur-3xl" />
+            <div className={`absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full ${isDark ? 'bg-emerald-600/15' : 'bg-emerald-400/10'} blur-[140px]`} />
+            <div className={`absolute top-1/3 -right-40 h-[500px] w-[500px] rounded-full ${isDark ? 'bg-teal-500/10' : 'bg-teal-300/10'} blur-[140px]`} />
           </>
         )}
         {isPassage && (
           <>
-            <div className="absolute inset-y-0 left-[-10%] h-[140%] w-[45%] rounded-full bg-amber-500/25 blur-3xl" />
-            <div className="absolute right-[-20%] top-[-10%] h-[120%] w-[50%] rounded-full bg-yellow-400/20 blur-3xl" />
-            <div className="absolute left-[25%] top-[10%] h-[70%] w-[50%] rounded-full bg-amber-600/15 blur-3xl" />
+            <div className={`absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full ${isDark ? 'bg-amber-500/15' : 'bg-amber-400/10'} blur-[140px]`} />
+            <div className={`absolute top-1/3 -right-40 h-[500px] w-[500px] rounded-full ${isDark ? 'bg-yellow-500/10' : 'bg-yellow-300/10'} blur-[140px]`} />
           </>
         )}
-        <div className="absolute inset-x-0 bottom-[-20%] h-[60%] bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" />
       </div>
 
       <div className="relative z-10 flex min-h-screen flex-col">
-        {/* Top Navigation & Subject Switcher */}
-        <header className="border-b border-white/10 bg-slate-950/70 backdrop-blur-md px-4 py-3 sticky top-0 z-30">
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
+        {/* Luxury Modern Header */}
+        <header className="sticky top-0 z-30 border-b border-zinc-200 dark:border-white/[0.08] bg-white/80 dark:bg-zinc-950/80 backdrop-blur-2xl transition-all">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-4">
+            {/* Brand Logo & Editorial Typography */}
+            <div className="flex items-center gap-3">
               <div
-                className={`p-2 rounded-xl transition-all duration-300 ${
-                  isPassage
-                    ? 'bg-gradient-to-br from-amber-400/20 to-yellow-500/20 border border-amber-400/30'
+                className={`relative flex items-center justify-center h-10 w-10 rounded-2xl border transition-all duration-300 shadow-sm ${
+                  isAnalogy
+                    ? 'border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-300'
+                    : isPassage
+                    ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300'
                     : isRhetoric
-                    ? 'bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30'
-                    : 'bg-gradient-to-br from-brand-500/20 to-cyan-500/20 border border-brand-500/30'
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
+                    : 'border-brand-500/30 bg-brand-500/10 text-brand-600 dark:text-brand-300'
                 }`}
               >
-                {isPassage ? (
-                  <Scroll className="h-5 w-5 text-amber-300" />
+                {isAnalogy ? (
+                  <Layers className="h-5 w-5" />
+                ) : isPassage ? (
+                  <Scroll className="h-5 w-5" />
                 ) : isRhetoric ? (
-                  <Feather className="h-5 w-5 text-emerald-400" />
+                  <Feather className="h-5 w-5" />
                 ) : (
-                  <BookMarked className="h-5 w-5 text-cyan-400" />
+                  <BookMarked className="h-5 w-5" />
                 )}
               </div>
               <div>
-                <h1 className="text-base font-extrabold tracking-tight text-white flex items-center gap-2">
-                  <span>Nativity</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full font-semibold border bg-white/5 border-white/10 text-slate-300">
+                <div className="flex items-center gap-2">
+                  <h1 className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-white flex items-baseline gap-1.5">
+                    <span>Nativity</span>
+                  </h1>
+                  <span className="text-[10px] font-mono tracking-widest uppercase px-2 py-0.5 rounded-full border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/[0.04] text-zinc-600 dark:text-zinc-400 font-semibold">
                     AP Lang
                   </span>
-                </h1>
-                <p className="text-[10px] text-slate-400">
-                  {isPassage
-                    ? 'AP Lang Passage Analysis & SOAPSTone'
+                </div>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
+                  {isAnalogy
+                    ? 'AP Lang Analogy Review'
+                    : isPassage
+                    ? 'Rhetorical Analysis & SOAPSTone Engine'
                     : isRhetoric
-                    ? 'Rhetorical Devices & Sentence Matching'
-                    : 'Comprehensive Vocabulary Suite'}
+                    ? 'Rhetorical Devices & Syntax Challenge'
+                    : 'Academic Vocabulary Mastery'}
                 </p>
               </div>
             </div>
 
-            {/* Actions: Subject Switcher + API Key Pill */}
-            <div className="flex items-center gap-2 flex-wrap justify-center">
-              {/* Subject Toggle Switch */}
-              <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-900/90 border border-white/10 shadow-inner">
+            {/* Navigation Tabs + Status Controls */}
+            <div className="flex items-center gap-2.5 flex-wrap justify-center">
+              {/* Segmented Subject Switcher */}
+              <nav className="flex items-center gap-1 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200 dark:border-white/[0.08]">
                 <button
-                  onClick={() => setSubject('vocab')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  onClick={() => !isLoading && setSubject('vocab')}
+                  disabled={isLoading}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 ${
+                    isLoading ? 'opacity-40 cursor-not-allowed' : ''
+                  } ${
                     isVocab
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-indigo-500/20 scale-[1.02]'
-                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                      ? 'bg-brand-600 text-white shadow-sm'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/[0.05]'
                   }`}
                 >
                   <BookOpen className="h-3.5 w-3.5" />
-                  Vocabulary
+                  <span>Vocabulary</span>
                 </button>
 
                 <button
-                  onClick={() => setSubject('rhetoric')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  onClick={() => !isLoading && setSubject('analogy')}
+                  disabled={isLoading}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 ${
+                    isLoading ? 'opacity-40 cursor-not-allowed' : ''
+                  } ${
+                    isAnalogy
+                      ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-sm'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/[0.05]'
+                  }`}
+                >
+                  <Layers className="h-3.5 w-3.5" />
+                  <span>Analogies</span>
+                </button>
+
+                <button
+                  onClick={() => !isLoading && setSubject('rhetoric')}
+                  disabled={isLoading}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 ${
+                    isLoading ? 'opacity-40 cursor-not-allowed' : ''
+                  } ${
                     isRhetoric
-                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-500/20 scale-[1.02]'
-                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/[0.05]'
                   }`}
                 >
-                  <Feather className="h-3.5 w-3.5 text-emerald-300" />
-                  Rhetorical Terms
+                  <Feather className="h-3.5 w-3.5" />
+                  <span>Rhetorical Terms</span>
                 </button>
 
                 <button
-                  onClick={() => setSubject('passage')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  onClick={() => !isLoading && setSubject('passage')}
+                  disabled={isLoading}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 ${
+                    isLoading ? 'opacity-40 cursor-not-allowed' : ''
+                  } ${
                     isPassage
-                      ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-lg shadow-amber-500/20 scale-[1.02]'
-                      : 'text-slate-400 hover:text-amber-200 hover:bg-white/5'
+                      ? 'bg-amber-500 text-zinc-950 font-bold shadow-sm'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/[0.05]'
                   }`}
                 >
-                  <Scroll className="h-3.5 w-3.5 text-amber-300" />
-                  Passage Study
+                  <Scroll className="h-3.5 w-3.5" />
+                  <span>Passage Study</span>
                 </button>
-              </div>
+              </nav>
 
-              {/* Efficient API Key Status Pill */}
+              {/* Theme Toggle Button (Light / Dark) */}
+              <button
+                onClick={() => setTheme(isDark ? 'light' : 'dark')}
+                className="p-2 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-zinc-100 dark:bg-white/[0.04] text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/[0.08] transition-all"
+                title={`Switch to ${isDark ? 'Light' : 'Dark'} mode`}
+              >
+                {isDark ? <Sun className="h-4 w-4 text-amber-300" /> : <Moon className="h-4 w-4 text-zinc-700" />}
+              </button>
+
+              {/* API Key Modal Button */}
               <button
                 onClick={() => setIsApiKeyModalOpen(true)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 border ${
                   apiKeyConfigured
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
-                    : 'bg-amber-500/10 border-amber-500/40 text-amber-300 hover:bg-amber-500/20 shadow-md shadow-amber-500/10 animate-pulse'
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20'
+                    : 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 animate-pulse'
                 }`}
-                title="Configure Gemini API Key"
+                title="Configure Google Gemini API Key"
               >
                 <span
                   className={`h-2 w-2 rounded-full ${
-                    apiKeyConfigured ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-amber-400'
+                    apiKeyConfigured ? 'bg-emerald-500 shadow-[0_0_6px_#10b981]' : 'bg-amber-500'
                   }`}
                 />
                 <KeyRound className="h-3 w-3" />
-                <span>{apiKeyConfigured ? 'API Connected' : 'Set API Key (Free)'}</span>
+                <span>{apiKeyConfigured ? 'API Connected' : 'Connect Key'}</span>
               </button>
             </div>
           </div>
         </header>
 
-        <main className="relative flex-1 px-4 pb-16 pt-8 md:px-8">
+        {/* Main Content Arena */}
+        <main className="relative flex-1 px-4 pb-20 pt-8 md:px-8">
           {isLoading && (
-            <div className="absolute inset-0 z-40 flex items-center justify-center bg-slate-950/75 backdrop-blur-md">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-md">
               <motion.div
-                className={`flex h-24 w-24 flex-col items-center justify-center rounded-3xl border ${
-                  isPassage
-                    ? 'border-amber-500/40 bg-amber-950/30'
-                    : isRhetoric
-                    ? 'border-emerald-500/30 bg-emerald-950/30'
-                    : 'border-white/20 bg-white/10'
-                }`}
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 2, ease: 'linear' }}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="card-glass p-8 rounded-3xl flex flex-col items-center gap-4 text-center max-w-sm shadow-luxury"
               >
-                <motion.span
-                  className={`h-12 w-12 rounded-full border-2 border-transparent ${
-                    isPassage
-                      ? 'border-t-amber-400'
-                      : isRhetoric
-                      ? 'border-t-emerald-400'
-                      : 'border-t-cyan-400'
-                  }`}
-                  animate={{ rotate: -360 }}
-                  transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }}
-                />
+                <div className="relative">
+                  <div className="h-14 w-14 rounded-full border-2 border-zinc-300 dark:border-white/10 border-t-brand-600 animate-spin" />
+                  <Sparkles className="h-6 w-6 text-brand-500 absolute inset-0 m-auto" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-lg font-semibold text-zinc-900 dark:text-zinc-50">Synthesizing Content</h3>
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed">
+                    Querying Gemini intelligence engine with AP-level pedagogical rigor...
+                  </p>
+                </div>
               </motion.div>
             </div>
           )}
 
-          <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
+          <div className="mx-auto flex w-full max-w-5xl flex-col gap-10">
             {/* ========================================================= */}
             {/* SECTION 1: VOCABULARY MODE                               */}
             {/* ========================================================= */}
@@ -256,26 +307,26 @@ function App() {
                       <TabsList
                         value={vocabMode}
                         onChange={(_: any, value: any) => setVocabMode(value as VocabLearningMode)}
-                        className="grid w-full grid-cols-4"
+                        className="grid w-full grid-cols-4 rounded-2xl bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-white/[0.08] p-1"
                       >
-                        <TabsTrigger value="flashcards" className="gap-2">
-                          <BookOpen className="h-4 w-4" /> Flashcards
+                        <TabsTrigger value="flashcards" className="gap-2 text-xs font-semibold">
+                          <BookOpen className="h-3.5 w-3.5" /> Flashcards
                         </TabsTrigger>
-                        <TabsTrigger value="quiz" className="gap-2">
-                          <Brain className="h-4 w-4" /> Quiz
+                        <TabsTrigger value="quiz" className="gap-2 text-xs font-semibold">
+                          <Brain className="h-3.5 w-3.5" /> Quiz
                         </TabsTrigger>
-                        <TabsTrigger value="matching" className="gap-2">
-                          <Grid3X3 className="h-4 w-4" /> Games
+                        <TabsTrigger value="matching" className="gap-2 text-xs font-semibold">
+                          <Grid3X3 className="h-3.5 w-3.5" /> Games
                         </TabsTrigger>
-                        <TabsTrigger value="paragraph" className="gap-2">
-                          <FileText className="h-4 w-4" /> Paragraph
+                        <TabsTrigger value="paragraph" className="gap-2 text-xs font-semibold">
+                          <FileText className="h-3.5 w-3.5" /> Context
                         </TabsTrigger>
                       </TabsList>
                     </Tabs>
 
                     <button
                       onClick={() => setVocabMode('input')}
-                      className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-slate-900/60 hover:bg-slate-800 transition-colors flex-shrink-0"
+                      className="text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-zinc-100 dark:bg-zinc-900/60 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all flex-shrink-0 font-medium"
                     >
                       <RotateCcw className="h-3.5 w-3.5" /> Change Words
                     </button>
@@ -283,41 +334,49 @@ function App() {
                 )}
 
                 <div className="relative">
-                  <div className="absolute inset-0 rounded-3xl bg-white/5 blur-3xl" />
-                  <div className="relative flex flex-col gap-10">
-                    {vocabMode === 'input' && (
-                      <VocabInput
-                        onGenerate={handleVocabDataGenerated}
-                        onLoadingChange={setIsLoading}
-                        onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
-                      />
-                    )}
+                  {vocabMode === 'input' && (
+                    <VocabInput
+                      onGenerate={handleVocabDataGenerated}
+                      onLoadingChange={setIsLoading}
+                      onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
+                    />
+                  )}
 
-                    {vocabMode === 'flashcards' && vocabData ? (
-                      <Flashcards flashcards={vocabData.flashcards} />
-                    ) : null}
+                  {vocabMode === 'flashcards' && vocabData ? (
+                    <Flashcards flashcards={vocabData.flashcards} />
+                  ) : null}
 
-                    {vocabMode === 'quiz' && vocabData ? (
-                      <Quiz questions={vocabData.quiz} vocabularyWords={vocabularyList} />
-                    ) : null}
+                  {vocabMode === 'quiz' && vocabData ? (
+                    <Quiz questions={vocabData.quiz} vocabularyWords={vocabularyList} />
+                  ) : null}
 
-                    {vocabMode === 'matching' && vocabData ? (
-                      <GameArea flashcards={vocabData.flashcards} />
-                    ) : null}
+                  {vocabMode === 'matching' && vocabData ? (
+                    <GameArea flashcards={vocabData.flashcards} />
+                  ) : null}
 
-                    {vocabMode === 'paragraph' && vocabData ? (
-                      <ParagraphPractice
-                        paragraphData={vocabData.paragraph}
-                        vocabularyWords={vocabularyList}
-                      />
-                    ) : null}
-                  </div>
+                  {vocabMode === 'paragraph' && vocabData ? (
+                    <ParagraphPractice
+                      paragraphData={vocabData.paragraph}
+                      vocabularyWords={vocabularyList}
+                    />
+                  ) : null}
                 </div>
               </>
             )}
 
             {/* ========================================================= */}
-            {/* SECTION 2: RHETORICAL TERMS MODE                          */}
+            {/* SECTION 2: ANALOGIES                                      */}
+            {/* ========================================================= */}
+            {isAnalogy && (
+              <div className="relative">
+                <ErrorBoundary>
+                  <AnalogyQuiz onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)} />
+                </ErrorBoundary>
+              </div>
+            )}
+
+            {/* ========================================================= */}
+            {/* SECTION 3: RHETORICAL TERMS MODE                          */}
             {/* ========================================================= */}
             {isRhetoric && (
               <>
@@ -329,26 +388,26 @@ function App() {
                         onChange={(_: any, value: any) =>
                           setRhetoricalMode(value as RhetoricalLearningMode)
                         }
-                        className="grid w-full grid-cols-4"
+                        className="grid w-full grid-cols-4 rounded-2xl bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-white/[0.08] p-1"
                       >
-                        <TabsTrigger value="sentence-game" className="gap-2">
-                          <Target className="h-4 w-4 text-emerald-400" /> Sentence Guess
+                        <TabsTrigger value="sentence-game" className="gap-2 text-xs font-semibold">
+                          <Target className="h-3.5 w-3.5 text-emerald-500" /> Sentence Guess
                         </TabsTrigger>
-                        <TabsTrigger value="flashcards" className="gap-2">
-                          <BookOpen className="h-4 w-4" /> Flashcards
+                        <TabsTrigger value="flashcards" className="gap-2 text-xs font-semibold">
+                          <BookOpen className="h-3.5 w-3.5" /> Flashcards
                         </TabsTrigger>
-                        <TabsTrigger value="quiz" className="gap-2">
-                          <Brain className="h-4 w-4" /> Quiz
+                        <TabsTrigger value="quiz" className="gap-2 text-xs font-semibold">
+                          <Brain className="h-3.5 w-3.5" /> Quiz
                         </TabsTrigger>
-                        <TabsTrigger value="passage" className="gap-2">
-                          <Feather className="h-4 w-4" /> Passage
+                        <TabsTrigger value="passage" className="gap-2 text-xs font-semibold">
+                          <Feather className="h-3.5 w-3.5" /> Passage
                         </TabsTrigger>
                       </TabsList>
                     </Tabs>
 
                     <button
                       onClick={() => setRhetoricalMode('input')}
-                      className="text-xs text-emerald-300 hover:text-white flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/20 bg-slate-900/60 hover:bg-slate-800 transition-colors flex-shrink-0"
+                      className="text-xs text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-white flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all flex-shrink-0 font-medium"
                     >
                       <RotateCcw className="h-3.5 w-3.5" /> Change Devices
                     </button>
@@ -356,75 +415,72 @@ function App() {
                 )}
 
                 <div className="relative">
-                  <div className="absolute inset-0 rounded-3xl bg-emerald-500/5 blur-3xl" />
-                  <div className="relative flex flex-col gap-10">
-                    {rhetoricalMode === 'input' && (
-                      <RhetoricalInput
-                        onGenerate={handleRhetoricalDataGenerated}
-                        onLoadingChange={setIsLoading}
-                        onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
-                      />
-                    )}
+                  {rhetoricalMode === 'input' && (
+                    <RhetoricalInput
+                      onGenerate={handleRhetoricalDataGenerated}
+                      onLoadingChange={setIsLoading}
+                      onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
+                    />
+                  )}
 
-                    {rhetoricalMode === 'sentence-game' && rhetoricalData ? (
-                      <RhetoricalSentenceGame
-                        sentenceMatches={rhetoricalData.sentenceMatches}
-                        rhetoricalTerms={rhetoricalTermsList}
-                        onBackToMenu={() => setRhetoricalMode('input')}
-                      />
-                    ) : null}
+                  {rhetoricalMode === 'sentence-game' && rhetoricalData ? (
+                    <RhetoricalSentenceGame
+                      sentenceMatches={rhetoricalData.sentenceMatches}
+                      rhetoricalTerms={rhetoricalTermsList}
+                      onBackToMenu={() => setRhetoricalMode('input')}
+                    />
+                  ) : null}
 
-                    {rhetoricalMode === 'flashcards' && rhetoricalData ? (
-                      <RhetoricalFlashcards flashcards={rhetoricalData.flashcards} />
-                    ) : null}
+                  {rhetoricalMode === 'flashcards' && rhetoricalData ? (
+                    <RhetoricalFlashcards flashcards={rhetoricalData.flashcards} />
+                  ) : null}
 
-                    {rhetoricalMode === 'quiz' && rhetoricalData ? (
-                      <RhetoricalQuiz
-                        questions={rhetoricalData.quiz}
-                        rhetoricalTerms={rhetoricalTermsList}
-                      />
-                    ) : null}
+                  {rhetoricalMode === 'quiz' && rhetoricalData ? (
+                    <RhetoricalQuiz
+                      questions={rhetoricalData.quiz}
+                      rhetoricalTerms={rhetoricalTermsList}
+                    />
+                  ) : null}
 
-                    {rhetoricalMode === 'passage' && rhetoricalData ? (
-                      <RhetoricalPassagePractice
-                        passageData={rhetoricalData.passage}
-                        rhetoricalTerms={rhetoricalTermsList}
-                      />
-                    ) : null}
-                  </div>
+                  {rhetoricalMode === 'passage' && rhetoricalData ? (
+                    <RhetoricalPassagePractice
+                      passageData={rhetoricalData.passage}
+                      rhetoricalTerms={rhetoricalTermsList}
+                    />
+                  ) : null}
                 </div>
               </>
             )}
 
             {/* ========================================================= */}
-            {/* SECTION 3: AP LANG PASSAGE STUDY MODE (GOLDEN NATIVITY)    */}
+            {/* SECTION 4: AP LANG PASSAGE STUDY MODE                      */}
             {/* ========================================================= */}
             {isPassage && (
               <div className="relative">
-                <div className="absolute inset-0 rounded-3xl bg-amber-500/5 blur-3xl" />
-                <div className="relative">
-                  <PassageStudy
-                    activeRhetoricalTerms={rhetoricalTermsList}
-                    activeVocabularyWords={vocabularyList}
-                    onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
-                  />
-                </div>
+                <PassageStudy
+                  activeRhetoricalTerms={rhetoricalTermsList}
+                  activeVocabularyWords={vocabularyList}
+                  onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
+                />
               </div>
             )}
           </div>
         </main>
 
-        <footer className="border-t border-white/10 bg-slate-950/70 px-4 py-6 text-center text-xs text-white/40">
-          <p className="mb-2 tracking-[0.2em] uppercase">Powered by Pyintel • Google Gemini</p>
-          <p className="mx-auto max-w-2xl text-[10px] leading-relaxed opacity-60">
-            This app is created and developed by a single developer. This is a generous service provided by a high school
-            student for high school students. The maintenance cost is high. Feel free to use this as needed, but please
-            do not spam it.
-          </p>
+        {/* Modern Footer */}
+        <footer className="border-t border-zinc-200 dark:border-white/[0.08] bg-white/60 dark:bg-zinc-950/60 px-4 py-8 text-center text-xs text-zinc-500 dark:text-zinc-500">
+          <div className="max-w-2xl mx-auto space-y-2">
+            <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-zinc-400">
+              Pyintel Architecture • Powered by Google Gemini
+            </p>
+            <p className="text-[11px] leading-relaxed text-zinc-500">
+              Crafted as an academic accelerator for high school students mastering AP English Language & Composition.
+            </p>
+          </div>
         </footer>
       </div>
 
-      {/* Global Unified API Key Collection Modal with Key Pooling */}
+      {/* Global Unified API Key Modal */}
       <ApiKeyModal
         isOpen={isApiKeyModalOpen}
         onClose={() => setIsApiKeyModalOpen(false)}

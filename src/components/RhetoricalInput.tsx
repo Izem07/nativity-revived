@@ -5,34 +5,15 @@ import {
   KeyRound,
   X,
   ShieldCheck,
-  ClipboardPaste,
   Feather,
-  BookOpen,
   Database,
-  ArrowRight,
-  HelpCircle,
   Plus,
-  GraduationCap,
   ChevronDown,
   ChevronUp,
   CheckCircle2,
-  FileText
+  BookOpen,
+  Info
 } from 'lucide-react';
-import TextField from '@mui/material/TextField';
-import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
-import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import Typography from '@mui/material/Typography';
-import Chip from '@mui/material/Chip';
-import Collapse from '@mui/material/Collapse';
-import Alert from '@mui/material/Alert';
-import Stack from '@mui/material/Stack';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-
 import { generateRhetoricalContent, RhetoricalGenerationResult, getStoredAPIKey } from '../services/geminiService';
 import { getCachedRhetoricalResult, setCachedRhetoricalResult } from '../services/cacheService';
 import { RHETORICAL_COURSE_UNITS, RhetoricalCourseUnit } from '../data/rhetoricalCourseData';
@@ -43,12 +24,7 @@ interface RhetoricalInputProps {
   onOpenApiKeyModal?: () => void;
 }
 
-const MIN_TERM_NUMBER_DIGITS = 2;
-const TERM_NUMBER_BADGE_BASE_WIDTH = 28;
-const TERM_NUMBER_BADGE_WIDTH_PER_DIGIT = 8;
-
 export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: RhetoricalInputProps) {
-  // Initialize with Unit 1 (Test 1) from the Course PPT
   const [selectedUnitId, setSelectedUnitId] = useState<string>(RHETORICAL_COURSE_UNITS[0].id);
   const [termsList, setTermsList] = useState<string[]>([...RHETORICAL_COURSE_UNITS[0].terms]);
   const [showCourseNotes, setShowCourseNotes] = useState(false);
@@ -68,10 +44,6 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
   }, [selectedUnitId]);
 
   const filledCount = useMemo(() => termsList.filter((term) => term.trim() !== '').length, [termsList]);
-  const termNumberDigits = Math.max(MIN_TERM_NUMBER_DIGITS, String(Math.max(termsList.length, 1)).length);
-  const termNumberMinWidth = TERM_NUMBER_BADGE_BASE_WIDTH + termNumberDigits * TERM_NUMBER_BADGE_WIDTH_PER_DIGIT;
-
-  const formatTermNumber = (position: number) => String(position).padStart(termNumberDigits, '0');
 
   const handleSelectUnit = (unit: RhetoricalCourseUnit) => {
     setSelectedUnitId(unit.id);
@@ -96,75 +68,55 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
     });
   };
 
-  const handlePaste = (event: React.ClipboardEvent<HTMLInputElement>) => {
-    const pasted = event.clipboardData.getData('text');
-    const terms = pasted
-      .split(/[,\n]/)
-      .map((t) => t.trim())
-      .filter(Boolean);
-
-    if (terms.length > 1) {
-      event.preventDefault();
-      setTermsList(terms.slice(0, 50));
-    }
-  };
-
   const handleProcessParagraph = () => {
     if (!paragraphText.trim()) return;
-    const extracted = paragraphText
+    const terms = paragraphText
       .split(/[,\n.;]+/)
-      .map((t) => t.trim())
-      .filter((t) => t.length > 0);
+      .map((term) => term.trim())
+      .filter((term) => term.length > 0);
 
-    if (extracted.length > 0) {
-      setTermsList(extracted.slice(0, 50));
+    if (terms.length > 0) {
+      setTermsList(terms.slice(0, 30));
       setInputMode('list');
       setParagraphText('');
       setError(null);
     } else {
-      setError('Could not extract any rhetorical devices from the text.');
+      setError('Could not extract rhetorical devices from the text.');
     }
   };
 
   const handleCheckCache = () => {
     const normalized = termsList.map((t) => t.trim()).filter(Boolean);
-    if (normalized.length < 3) {
-      setError('Please enter at least 3 rhetorical terms.');
-      return;
-    }
-    const cached = getCachedRhetoricalResult(normalized);
+    const cached = getCachedRhetoricalResult(normalized.length >= 2 ? normalized : undefined);
     if (cached) {
-      setPendingTerms(normalized);
-      setCacheDialogOpen(true);
+      onGenerate(cached.data, cached.terms);
+      onLoadingChange(false);
+      setError(null);
     } else {
-      setError('No cached data found for this rhetorical terms list.');
+      setError('No cached rhetorical study packet found in local storage. Generate one first!');
     }
   };
 
-  const handleGenerate = () => {
+  const handleGenerateClick = () => {
     const normalized = termsList.map((t) => t.trim()).filter(Boolean);
-    if (normalized.length < 3) {
-      setError('Please enter at least 3 rhetorical terms.');
+    if (normalized.length < 2) {
+      setError('Please provide at least 2 rhetorical devices.');
       return;
     }
-    if (normalized.length > 50) {
-      setError('Please enter no more than 50 rhetorical terms.');
+    // Check if this exact set already has cached data to save API credits
+    const cached = getCachedRhetoricalResult(normalized);
+    if (cached) {
+      onGenerate(cached.data, normalized);
+      onLoadingChange(false);
       return;
-    }
-    if (!getStoredAPIKey()) {
-      if (onOpenApiKeyModal) {
-        onOpenApiKeyModal();
-        return;
-      }
     }
     setPendingTerms(normalized);
     setConfirmGenerateOpen(true);
   };
 
-  const handleConfirmGenerate = async () => {
+  const handleConfirmGenerate = () => {
     setConfirmGenerateOpen(false);
-    await runGenerate(pendingTerms);
-    setPendingTerms([]);
+    runGenerate(pendingTerms);
   };
 
   const handleUseCached = () => {
@@ -190,7 +142,7 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
       setError(
         generateError instanceof Error
           ? generateError.message
-          : 'Failed to generate rhetorical study materials. Please check your API key and try again.'
+          : 'Failed to generate rhetorical study packet. Please check your API key.',
       );
       onLoadingChange(false);
     } finally {
@@ -199,353 +151,216 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
   };
 
   return (
-    <Box sx={{ mx: 'auto', width: '100%', maxWidth: 960, display: 'flex', flexDirection: 'column', gap: 3 }}>
-      {/* Header Banner */}
-      <motion.header
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: 'easeOut' }}
-      >
-        <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ mb: 2 }}>
-          <Chip
-            icon={<GraduationCap className="h-4 w-4 text-emerald-400" />}
-            label="AP Language & Composition Curriculum"
-            sx={{
-              fontWeight: 700,
-              bgcolor: 'rgba(16, 185, 129, 0.15)',
-              color: '#34d399',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-            }}
-          />
-        </Stack>
+    <div className="w-full max-w-4xl mx-auto flex flex-col gap-8">
+      {/* Editorial Header */}
+      <div className="text-center space-y-3">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-semibold tracking-wide uppercase">
+          <Feather className="h-3.5 w-3.5" />
+          <span>AP Lang Rhetorical Analysis</span>
+        </div>
+        <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          Rhetorical Devices & Syntax
+        </h2>
+        <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 max-w-xl mx-auto leading-relaxed">
+          Master devices by identifying syntactic patterns in authentic sentences, studying famous historical orations, and taking AP-tier analytical quizzes.
+        </p>
+      </div>
 
-        <Typography
-          variant="h3"
-          align="center"
-          sx={{
-            fontWeight: 800,
-            letterSpacing: 2,
-            background: 'linear-gradient(to right, #34d399, #2dd4bf, #fde047)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            fontFamily: 'serif',
-          }}
-        >
-          Rhetorical Terms: Course Material
-        </Typography>
-
-        <Typography variant="body1" align="center" sx={{ mt: 1, color: 'text.secondary', maxWidth: 740, mx: 'auto' }}>
-          Select your class unit to study exact terms, definitions, and examples from the AP Lang course PPT.
-          Test your mastery with <strong>Sentence Guessing, Flashcards, Quizzes</strong>, and <strong>Passage Practice</strong>.
-        </Typography>
-      </motion.header>
-
-      {/* Main Container Paper */}
-      <Paper elevation={6} sx={{ p: 3, border: '1px solid rgba(16, 185, 129, 0.2)', bgcolor: 'rgba(15, 23, 42, 0.85)' }}>
-        {/* Course Units Selector - Tab Grid */}
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-            <Typography variant="subtitle2" sx={{ color: 'white', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <BookOpen className="h-4 w-4 text-emerald-400" />
-              Course Units (Tests 1–10 from Class Material)
-            </Typography>
-            <span className="text-xs text-emerald-300/80 font-mono">
-              {RHETORICAL_COURSE_UNITS.length} Units Configured
+      {/* Main Workspace Card */}
+      <div className="card-glass rounded-3xl p-6 sm:p-10 relative overflow-hidden transition-all">
+        {/* Course Units Selector */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[11px] font-mono tracking-wider uppercase text-zinc-500 dark:text-zinc-400 font-semibold">
+              Canonical Course Curriculum (Tests 1–10)
             </span>
-          </Box>
+            {activeUnit && (
+              <button
+                onClick={() => setShowCourseNotes(!showCourseNotes)}
+                className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-medium"
+              >
+                {showCourseNotes ? 'Hide Definitions' : 'View Definitions'}
+                {showCourseNotes ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </button>
+            )}
+          </div>
 
-          {/* Unit Pills Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
             {RHETORICAL_COURSE_UNITS.map((unit) => {
-              const isSelected = selectedUnitId === unit.id;
+              const isSelected = unit.id === selectedUnitId;
               return (
                 <button
                   key={unit.id}
                   onClick={() => handleSelectUnit(unit)}
-                  className={`p-2.5 rounded-xl text-left border transition-all text-xs flex flex-col justify-between ${
+                  className={`p-3 rounded-2xl border text-left transition-all ${
                     isSelected
-                      ? 'bg-emerald-950/60 border-emerald-400 text-white shadow-md shadow-emerald-500/10 ring-1 ring-emerald-400'
-                      : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white hover:border-emerald-500/40'
+                      ? 'border-emerald-500 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200 shadow-sm'
+                      : 'border-zinc-200 dark:border-white/[0.06] bg-zinc-50 dark:bg-white/[0.02] text-zinc-700 dark:text-zinc-300 hover:border-emerald-500/40'
                   }`}
                 >
-                  <div className="font-bold text-emerald-400 truncate mb-1">
-                    {typeof unit.testNumber === 'number' ? `Test ${unit.testNumber}` : unit.testNumber}
+                  <div className="text-xs font-semibold truncate">{unit.title}</div>
+                  <div className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate mt-0.5">
+                    {unit.terms.length} devices
                   </div>
-                  <div className="text-[11px] text-slate-200 truncate">{unit.unitTitle.split(':')[1]?.trim() || unit.unitTitle}</div>
-                  <div className="text-[10px] text-slate-400 mt-1">{unit.terms.length} Terms</div>
                 </button>
               );
             })}
           </div>
 
-          {/* Active Unit Description Banner */}
-          {activeUnit && (
-            <Box
-              sx={{
-                mt: 2,
-                p: 2,
-                borderRadius: 2,
-                bgcolor: 'rgba(6, 78, 59, 0.25)',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 1,
-              }}
+          {/* Collapsible Course Notes */}
+          <AnimatePresence>
+            {showCourseNotes && activeUnit && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-4 p-5 rounded-2xl bg-zinc-100 dark:bg-zinc-950/60 border border-zinc-200 dark:border-white/[0.08] space-y-3"
+              >
+                <div className="font-serif text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                  {activeUnit.title} — Teacher PPT Notes
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {activeUnit.termsDetailed.map((td) => (
+                    <div key={td.term} className="p-3 rounded-xl bg-white dark:bg-white/[0.03] border border-zinc-200 dark:border-white/[0.06]">
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400 block">{td.term}</span>
+                      <p className="text-zinc-600 dark:text-zinc-400 text-[11px] mt-0.5">{td.definition}</p>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Input Mode Content */}
+        <div className="space-y-6 pt-4 border-t border-zinc-200 dark:border-white/[0.08]">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono tracking-wider uppercase text-zinc-500 dark:text-zinc-400 font-semibold">
+              Active Devices to Study ({filledCount})
+            </span>
+            <button
+              onClick={handleAddTerm}
+              className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-semibold"
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
-                <Typography variant="body2" sx={{ color: 'white', fontWeight: 600 }}>
-                  <span className="text-emerald-400 font-bold">{activeUnit.unitTitle}: </span>
-                  {activeUnit.description}
-                </Typography>
-
-                {activeUnit.termsDetailed.length > 0 && (
-                  <Button
-                    size="small"
-                    onClick={() => setShowCourseNotes((prev) => !prev)}
-                    sx={{ color: '#34d399', textTransform: 'none', fontSize: '0.75rem' }}
-                    endIcon={showCourseNotes ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                  >
-                    {showCourseNotes ? 'Hide PPT Notes' : 'View Course PPT Definitions & Examples'}
-                  </Button>
-                )}
-              </Box>
-
-              {/* Course PPT Notes Collapse */}
-              <Collapse in={showCourseNotes}>
-                <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                    {activeUnit.termsDetailed.map((item, idx) => (
-                      <div key={idx} className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5 space-y-1">
-                        <span className="font-bold text-emerald-300 block text-xs">{item.term}</span>
-                        <p className="text-slate-300 leading-relaxed text-[11px]">{item.definition}</p>
-                        {item.example && (
-                          <p className="text-amber-200/90 italic font-serif text-[11px] pt-0.5">
-                            Ex: “{item.example}”
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </Box>
-              </Collapse>
-            </Box>
-          )}
-        </Box>
-
-        {/* Input Controls Bar */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, pt: 2, borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-          <div>
-            <Typography variant="subtitle2" sx={{ color: 'white' }}>
-              Terms to Study ({filledCount} Loaded)
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {inputMode === 'list'
-                ? 'Terms pre-populated from course unit. You can add or modify terms as needed.'
-                : 'Paste a syllabus or notes text to extract devices.'}
-            </Typography>
+              <Plus className="h-3.5 w-3.5" /> Add Device
+            </button>
           </div>
 
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button
-              size="small"
-              variant={inputMode === 'list' ? 'contained' : 'outlined'}
-              onClick={() => setInputMode('list')}
-              sx={inputMode === 'list' ? { bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' } } : {}}
-            >
-              List Mode
-            </Button>
-            <Button
-              size="small"
-              variant={inputMode === 'paragraph' ? 'contained' : 'outlined'}
-              onClick={() => setInputMode('paragraph')}
-              sx={inputMode === 'paragraph' ? { bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' } } : {}}
-            >
-              Extract Mode
-            </Button>
-          </Box>
-        </Box>
-
-        {/* Mode: List Entry */}
-        {inputMode === 'list' ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={{ maxHeight: '380px', overflowY: 'auto', pr: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          {/* Terms Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+            <AnimatePresence initial={false}>
               {termsList.map((term, index) => (
-                <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Box
-                    sx={{
-                      width: termNumberMinWidth,
-                      height: 28,
-                      borderRadius: 1,
-                      bgcolor: 'rgba(16, 185, 129, 0.15)',
-                      color: '#34d399',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {formatTermNumber(index + 1)}
-                  </Box>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    placeholder="Enter device name..."
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="flex items-center gap-1.5 p-1 rounded-xl bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-white/[0.08]"
+                >
+                  <input
+                    type="text"
                     value={term}
                     onChange={(e) => handleTermChange(index, e.target.value)}
-                    onPaste={index === 0 ? handlePaste : undefined}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        bgcolor: 'rgba(2, 6, 23, 0.6)',
-                        color: 'white',
-                        '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
-                        '&:hover fieldset': { borderColor: 'rgba(16, 185, 129, 0.4)' },
-                        '&.Mui-focused fieldset': { borderColor: '#10b981' },
-                      },
-                    }}
+                    placeholder="Rhetorical Device"
+                    className="flex-1 px-2.5 py-1.5 bg-transparent text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none font-medium"
                   />
                   {termsList.length > 1 && (
-                    <IconButton size="small" onClick={() => handleRemoveTerm(index)} sx={{ color: 'text.secondary' }}>
-                      <X className="h-4 w-4" />
-                    </IconButton>
+                    <button
+                      onClick={() => handleRemoveTerm(index)}
+                      className="p-1 rounded-lg text-zinc-400 hover:text-rose-500 transition-colors"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
                   )}
-                </Box>
+                </motion.div>
               ))}
-            </Box>
+            </AnimatePresence>
+          </div>
 
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
-              <Button
-                startIcon={<Plus className="h-4 w-4" />}
-                onClick={handleAddTerm}
-                size="small"
-                disabled={termsList.length >= 50}
-                sx={{ color: '#34d399' }}
-              >
-                Add Another Device
-              </Button>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                {filledCount} of {termsList.length} devices entered (Min: 3, Max: 50)
-              </Typography>
-            </Box>
-          </Box>
-        ) : (
-          /* Mode: Paragraph Extraction */
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              multiline
-              rows={5}
-              placeholder="Paste a comma-separated or text excerpt containing rhetorical terms..."
-              value={paragraphText}
-              onChange={(e) => setParagraphText(e.target.value)}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  bgcolor: 'rgba(2, 6, 23, 0.6)',
-                  color: 'white',
-                  '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
-                  '&.Mui-focused fieldset': { borderColor: '#10b981' },
-                },
-              }}
-            />
-            <Button
-              variant="contained"
-              onClick={handleProcessParagraph}
-              disabled={!paragraphText.trim()}
-              sx={{ alignSelf: 'flex-start', bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' } }}
-            >
-              Extract Devices
-            </Button>
-          </Box>
-        )}
-
-        {/* Error message */}
-        {error && (
-          <Alert severity="error" sx={{ mt: 2 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
-
-        {/* Action Buttons */}
-        <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'space-between', alignItems: 'center' }}>
-          <Button
-            size="small"
-            startIcon={<KeyRound className="h-4 w-4 text-emerald-400" />}
-            onClick={onOpenApiKeyModal}
-            sx={{ color: getStoredAPIKey() ? '#34d399' : 'text.secondary' }}
-          >
-            {getStoredAPIKey() ? '✓ Gemini API Key Pool Ready' : 'Connect Gemini API Key (Free)'}
-          </Button>
-
-          <Stack direction="row" spacing={1.5}>
-            <Button
-              variant="outlined"
+          {/* Action Row */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-zinc-200 dark:border-white/[0.08]">
+            <button
               onClick={handleCheckCache}
-              startIcon={<Database className="h-4 w-4 text-emerald-400" />}
-              disabled={isGenerating || filledCount < 3}
-              sx={{ borderColor: 'rgba(16, 185, 129, 0.3)', color: '#34d399' }}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-semibold tracking-wide transition-all"
+              title="Load any previously stored rhetorical study packet without using API credits"
             >
-              Check Cache
-            </Button>
-            <Button
-              variant="contained"
-              onClick={handleGenerate}
-              disabled={isGenerating || filledCount < 3}
-              startIcon={<Sparkles className="h-4 w-4" />}
-              sx={{ bgcolor: '#10b981', color: '#022c22', fontWeight: 700, '&:hover': { bgcolor: '#34d399' } }}
+              <Database className="h-3.5 w-3.5" />
+              <span>Load Cached Packet</span>
+            </button>
+
+            <button
+              onClick={handleGenerateClick}
+              disabled={isGenerating || filledCount < 2}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white font-semibold text-xs tracking-wide uppercase shadow-md shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40"
             >
-              {isGenerating ? 'Generating Materials...' : `Study ${activeUnit ? activeUnit.unitTitle.split(':')[0] : 'Selected Terms'}`}
-            </Button>
-          </Stack>
-        </Box>
-      </Paper>
+              <Sparkles className="h-4 w-4" />
+              <span>{isGenerating ? 'Synthesizing...' : 'Generate Sentence Game & Quiz'}</span>
+            </button>
+          </div>
+        </div>
 
-      {/* Confirmation to Generate Dialog */}
-      <Dialog open={confirmGenerateOpen} onClose={() => setConfirmGenerateOpen(false)}>
-        <DialogTitle sx={{ bgcolor: '#0f172a', color: 'white' }}>Generate Study Materials?</DialogTitle>
-        <DialogContent sx={{ bgcolor: '#0f172a', color: '#94a3b8' }}>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            This will craft customized AP Lang flashcards, quizzes, rhetorical analysis passages, and the interactive{' '}
-            <strong>Sentence Guessing Challenge</strong> for {pendingTerms.length} rhetorical devices.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ bgcolor: '#0f172a', p: 2 }}>
-          <Button onClick={() => setConfirmGenerateOpen(false)} sx={{ color: '#94a3b8' }}>
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleConfirmGenerate}
-            sx={{ bgcolor: '#10b981', color: '#022c22', fontWeight: 700, '&:hover': { bgcolor: '#34d399' } }}
-          >
-            Start Generation
-          </Button>
-        </DialogActions>
-      </Dialog>
+        {/* Error Alert */}
+        {error && (
+          <div className="mt-6 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="text-rose-500 hover:text-rose-700">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
 
-      {/* Use Cache Dialog */}
-      <Dialog open={cacheDialogOpen} onClose={() => setCacheDialogOpen(false)}>
-        <DialogTitle sx={{ bgcolor: '#0f172a', color: 'white' }}>Cached Materials Found!</DialogTitle>
-        <DialogContent sx={{ bgcolor: '#0f172a', color: '#94a3b8' }}>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            We found previously generated study materials for this unit. You can load them instantly
-            without using Gemini API tokens.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ bgcolor: '#0f172a', p: 2 }}>
-          <Button onClick={handleConfirmGenerate} sx={{ color: '#94a3b8' }}>
-            Generate Fresh
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleUseCached}
-            sx={{ bgcolor: '#10b981', color: '#022c22', fontWeight: 700, '&:hover': { bgcolor: '#34d399' } }}
-          >
-            Load from Cache
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+      {/* Confirmation Modal */}
+      {confirmGenerateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-md">
+          <div className="card-glass rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-luxury">
+            <h3 className="font-serif text-lg font-semibold text-zinc-900 dark:text-zinc-50">Generate Rhetorical Packet?</h3>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              This calls Gemini AI to build sentence guessing games, flashcards, and an AP-tier rhetorical analysis quiz for {pendingTerms.length} devices.
+            </p>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setConfirmGenerateOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-zinc-200 dark:border-white/[0.1] text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/[0.05] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmGenerate}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 transition-colors"
+              >
+                Generate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cache Dialog Modal */}
+      {cacheDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-md">
+          <div className="card-glass rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-luxury">
+            <h3 className="font-serif text-lg font-semibold text-zinc-900 dark:text-zinc-50">Saved Packet Found</h3>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              A pre-generated study packet was found for this exact set of rhetorical terms. Load it immediately?
+            </p>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setCacheDialogOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-zinc-200 dark:border-white/[0.1] text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/[0.05] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUseCached}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 transition-colors"
+              >
+                Load Cached
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
-
-export default RhetoricalInput;

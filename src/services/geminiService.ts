@@ -3,6 +3,7 @@ import { FlashcardItem } from '../components/Flashcards';
 import { MatchingPair } from '../components/Matching';
 import { ParagraphData } from '../components/ParagraphPractice';
 import { QuizQuestion } from '../components/Quiz';
+import { globalKeyPool } from './keyPoolService';
 
 export const getStoredAPIKey = (): string => {
   const storedKey = localStorage.getItem('GEMINI_API_KEY');
@@ -27,14 +28,10 @@ export const getAPIKey = () => {
 
 // Helper function to extract and parse JSON from a string that might include markdown fences
 const extractAndParseJson = (text: string) => {
-  // The model may return JSON wrapped in ```json ... ```.
-  // It might also include text before or after the JSON block.
-  // This regex finds the JSON content.
-  const match = text.match(/```json\n([\s\S]*?)\n```|({[\s\S]*})/);
-  if (match && (match[1] || match[2])) {
+  const match = text.match(/```json\n([\s\S]*?)\n```|({[\s\S]*})|(\[[\s\S]*\])/);
+  if (match && (match[1] || match[2] || match[3])) {
     try {
-      // Use the first captured group that has content
-      return JSON.parse(match[1] || match[2]);
+      return JSON.parse(match[1] || match[2] || match[3]);
     } catch (e) {
       console.error("Failed to parse extracted JSON:", e);
       console.error("Original text:", text);
@@ -42,7 +39,6 @@ const extractAndParseJson = (text: string) => {
     }
   }
 
-  // Fallback for cases where the regex might fail but the text is valid JSON
   try {
     return JSON.parse(text);
   } catch (e) {
@@ -52,30 +48,9 @@ const extractAndParseJson = (text: string) => {
   }
 };
 
-// Helper function to retry API calls with exponential backoff
-const retryAPICall = async (fn: () => Promise<any>, maxRetries = 2) => {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const result = await fn();
-      if (result && result.response && result.response.text()) {
-        return result;
-      }
-      throw new Error('Empty response from API');
-    } catch (error: any) {
-      if (attempt === maxRetries) throw error;
-      console.warn(`Attempt ${attempt} failed, retrying...`);
-      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-    }
-  }
-};
-
-
 export const generateQuizContent = async (vocabularyList: string[]): Promise<QuizGenerationResult> => {
-  try {
-    const API_KEY = getAPIKey();
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
-
+  return globalKeyPool.executeWithRotation(async (genAI) => {
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
     const vocabString = vocabularyList.join(', ');
 
     // Generate Quiz Questions
@@ -97,11 +72,7 @@ export const generateQuizContent = async (vocabularyList: string[]): Promise<Qui
       ]
     }`;
 
-    const quizResult = await model.generateContent(quizPrompt);
-    const quizText = quizResult.response.text();
-    const quizData = extractAndParseJson(quizText);
-
-    // Generate Flashcards with ALL required fields including mnemonics
+    // Generate Flashcards
     const flashcardPrompt = `Create comprehensive flashcards for these AP Lang vocabulary words: ${vocabString}.
     
     IMPORTANT: You MUST provide ALL of the following fields for each word:
@@ -113,8 +84,6 @@ export const generateQuizContent = async (vocabularyList: string[]): Promise<Qui
     6. Etymology (word origin and root meaning)
     7. An example sentence using the word
     8. A creative MNEMONIC - a memory trick, funny association, rhyme, or story to help remember the word
-    
-    For the mnemonic, be creative! Use wordplay, visual imagery, funny stories, or rhymes. Make it memorable and engaging.
     
     Format your response as JSON with this structure:
     {
@@ -134,10 +103,6 @@ export const generateQuizContent = async (vocabularyList: string[]): Promise<Qui
     
     Do NOT skip any fields. Every flashcard must have all 8 fields filled in.`;
 
-    const flashcardResult = await model.generateContent(flashcardPrompt);
-    const flashcardText = flashcardResult.response.text();
-    const flashcardData = extractAndParseJson(flashcardText);
-
     // Generate Matching pairs
     const matchingPrompt = `Create matching pairs for these AP Lang vocabulary words: ${vocabString}.
     Provide the word and a brief definition (5-10 words).
@@ -151,10 +116,6 @@ export const generateQuizContent = async (vocabularyList: string[]): Promise<Qui
         }
       ]
     }`;
-
-    const matchingResult = await model.generateContent(matchingPrompt);
-    const matchingText = matchingResult.response.text();
-    const matchingData = extractAndParseJson(matchingText);
 
     // Generate Practice Paragraph
     const paragraphPrompt = `Write a cohesive paragraph (150-200 words) that uses ALL of these AP Lang vocabulary words: ${vocabString}.
@@ -172,23 +133,25 @@ export const generateQuizContent = async (vocabularyList: string[]): Promise<Qui
       ]
     }`;
 
-    const paragraphResult = await model.generateContent(paragraphPrompt);
-    const paragraphText = paragraphResult.response.text();
-    const paragraphData = extractAndParseJson(paragraphText);
+    const [quizResult, flashcardResult, matchingResult, paragraphResult] = await Promise.all([
+      model.generateContent(quizPrompt),
+      model.generateContent(flashcardPrompt),
+      model.generateContent(matchingPrompt),
+      model.generateContent(paragraphPrompt)
+    ]);
+
+    const quizData = extractAndParseJson(quizResult.response.text());
+    const flashcardData = extractAndParseJson(flashcardResult.response.text());
+    const matchingData = extractAndParseJson(matchingResult.response.text());
+    const paragraphData = extractAndParseJson(paragraphResult.response.text());
 
     return {
-      quiz: quizData.questions,
-      flashcards: flashcardData.flashcards,
-      matching: matchingData.pairs,
+      quiz: quizData.questions || [],
+      flashcards: flashcardData.flashcards || [],
+      matching: matchingData.pairs || [],
       paragraph: paragraphData
     };
-  } catch (error) {
-    console.error('Error generating content:', error);
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('Failed to generate quiz content. Please check your API key and try again.');
-  }
+  });
 };
 
 export const testAPIKey = async (candidateKey?: string): Promise<{ valid: boolean; error?: string }> => {
@@ -196,7 +159,7 @@ export const testAPIKey = async (candidateKey?: string): Promise<{ valid: boolea
     const key = candidateKey ? candidateKey.trim() : getStoredAPIKey();
     if (!key) return { valid: false, error: 'No API key provided' };
     const genAI = new GoogleGenerativeAI(key);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
     const result = await model.generateContent('ping');
     return { valid: Boolean(result.response.text()) };
   } catch (err: any) {
@@ -216,11 +179,8 @@ export const generateMoreQuizQuestions = async (
   difficulty: 'easy' | 'medium' | 'hard' | 'custom' = 'medium',
   customTopic: string = ''
 ): Promise<QuizQuestion[]> => {
-  try {
-    const API_KEY = getAPIKey();
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
-
+  return globalKeyPool.executeWithRotation(async (genAI) => {
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
     const vocabString = vocabularyList.join(', ');
 
     let difficultyInstruction = '';
@@ -254,15 +214,10 @@ export const generateMoreQuizQuestions = async (
       ]
     }`;
 
-    const quizResult = await retryAPICall(() => model.generateContent(quizPrompt));
-    const quizText = quizResult.response.text();
-    const quizData = extractAndParseJson(quizText);
-
-    return quizData.questions;
-  } catch (error) {
-    console.error('Error generating more quiz questions:', error);
-    throw new Error('Failed to generate more quiz questions. Please try again.');
-  }
+    const quizResult = await model.generateContent(quizPrompt);
+    const quizData = extractAndParseJson(quizResult.response.text());
+    return quizData.questions || [];
+  });
 };
 
 export const generateMoreParagraph = async (
@@ -270,11 +225,8 @@ export const generateMoreParagraph = async (
   difficulty: 'easy' | 'medium' | 'hard' | 'custom' = 'medium',
   customTopic: string = ''
 ): Promise<ParagraphData> => {
-  try {
-    const API_KEY = getAPIKey();
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
-
+  return globalKeyPool.executeWithRotation(async (genAI) => {
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
     const vocabString = vocabularyList.join(', ');
 
     let difficultyInstruction = '';
@@ -311,15 +263,9 @@ export const generateMoreParagraph = async (
       ]
     }`;
 
-    const paragraphResult = await retryAPICall(() => model.generateContent(paragraphPrompt));
-    const paragraphText = paragraphResult.response.text();
-    const paragraphData = extractAndParseJson(paragraphText);
-
-    return paragraphData;
-  } catch (error) {
-    console.error('Error generating more paragraphs:', error);
-    throw new Error('Failed to generate a new paragraph. Please try again.');
-  }
+    const paragraphResult = await model.generateContent(paragraphPrompt);
+    return extractAndParseJson(paragraphResult.response.text());
+  });
 };
 
 export const generateHangmanWords = async (
@@ -327,10 +273,8 @@ export const generateHangmanWords = async (
   count: number,
   difficulty: 'easy' | 'medium' | 'hard' | 'custom'
 ): Promise<FlashcardItem[]> => {
-  try {
-    const API_KEY = getAPIKey();
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
+  return globalKeyPool.executeWithRotation(async (genAI) => {
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     let prompt = '';
     if (difficulty === 'custom') {
@@ -353,7 +297,6 @@ export const generateHangmanWords = async (
         ]
       }`;
     } else {
-      // Fallback or standard generation if needed, though standard usually uses existing list
       prompt = `Generate ${count} vocabulary words for a ${difficulty} level Hangman game.
       Format as JSON:
       {
@@ -367,30 +310,21 @@ export const generateHangmanWords = async (
       }`;
     }
 
-    const result = await retryAPICall(() => model.generateContent(prompt));
-    const text = result.response.text();
-    const data = extractAndParseJson(text);
+    const result = await model.generateContent(prompt);
+    const data = extractAndParseJson(result.response.text());
 
-    // Map to FlashcardItem structure (partial)
-    return data.words.map((item: any) => ({
+    return (data.words || []).map((item: any) => ({
       word: item.word,
       definition: item.definition,
       mnemonic: item.mnemonic,
-      // Fill other required fields with placeholders as they aren't needed for Hangman
       synonyms: '',
       antonyms: '',
       context: '',
       etymology: '',
       example: ''
     }));
-
-  } catch (error) {
-    console.error('Error generating hangman words:', error);
-    throw new Error('Failed to generate custom hangman words.');
-  }
+  });
 };
-
-
 
 // ==========================================
 // RHETORICAL TERMS & DEVICES EXTENSION
@@ -446,11 +380,8 @@ export interface RhetoricalGenerationResult {
 }
 
 export const generateRhetoricalContent = async (termsList: string[]): Promise<RhetoricalGenerationResult> => {
-  try {
-    const API_KEY = getAPIKey();
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
-
+  return globalKeyPool.executeWithRotation(async (genAI) => {
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
     const termsString = termsList.join(', ');
 
     // 1. Rhetorical Flashcards
@@ -480,15 +411,14 @@ export const generateRhetoricalContent = async (termsList: string[]): Promise<Rh
       ]
     }`;
 
-    // 2. Sentence Guessing & Matching items:
-    // "instead of matching you have to guess which sentence matches with the provided rhetorical terms you want to study"
+    // 2. Sentence Guessing & Matching items
     const sentenceMatchPrompt = `Create sentence guessing challenges for these AP Lang rhetorical terms: ${termsString}.
     For EACH term, generate:
     1. "term": The rhetorical device name
     2. "targetSentence": A rich, vivid sentence that clearly and unquestionably demonstrates this specific rhetorical device.
     3. "keyFeature": The specific phrase or syntactic pattern in the sentence that creates this device (e.g., "reversal of words A-B into B-A" or "deliberate omission of conjunctions").
     4. "explanation": A detailed, educational explanation of why this sentence matches the device and how it creates its rhetorical effect.
-    5. "distractorSentences": Exactly 3 well-crafted sentences that DO NOT use this device (they should each use a different rhetorical device or normal grammar), each with a brief "deviceOrReason" explaining why it is NOT the target device (e.g. "Uses metaphor rather than anaphora").
+    5. "distractorSentences": Exactly 3 well-crafted sentences that DO NOT use this device (they should each use a different rhetorical device or normal grammar), each with a brief "deviceOrReason" explaining why it is NOT the target device.
     
     Format as JSON:
     {
@@ -550,12 +480,11 @@ export const generateRhetoricalContent = async (termsList: string[]): Promise<Rh
       ]
     }`;
 
-    // Execute requests in parallel with retries
     const [flashcardResult, sentenceMatchResult, quizResult, passageResult] = await Promise.all([
-      retryAPICall(() => model.generateContent(flashcardPrompt)),
-      retryAPICall(() => model.generateContent(sentenceMatchPrompt)),
-      retryAPICall(() => model.generateContent(quizPrompt)),
-      retryAPICall(() => model.generateContent(passagePrompt))
+      model.generateContent(flashcardPrompt),
+      model.generateContent(sentenceMatchPrompt),
+      model.generateContent(quizPrompt),
+      model.generateContent(passagePrompt)
     ]);
 
     const flashcardData = extractAndParseJson(flashcardResult.response.text());
@@ -569,13 +498,7 @@ export const generateRhetoricalContent = async (termsList: string[]): Promise<Rh
       quiz: quizData.questions || [],
       passage: passageData
     };
-  } catch (error) {
-    console.error('Error generating rhetorical content:', error);
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('Failed to generate rhetorical study content. Please check your API key and try again.');
-  }
+  });
 };
 
 export const generateMoreRhetoricalQuizQuestions = async (
@@ -583,10 +506,8 @@ export const generateMoreRhetoricalQuizQuestions = async (
   difficulty: 'easy' | 'medium' | 'hard' | 'custom' = 'medium',
   customTopic: string = ''
 ): Promise<RhetoricalQuizQuestion[]> => {
-  try {
-    const API_KEY = getAPIKey();
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
+  return globalKeyPool.executeWithRotation(async (genAI) => {
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
     const termsString = termsList.join(', ');
 
     let instruction = '';
@@ -616,13 +537,10 @@ export const generateMoreRhetoricalQuizQuestions = async (
       ]
     }`;
 
-    const result = await retryAPICall(() => model.generateContent(prompt));
+    const result = await model.generateContent(prompt);
     const data = extractAndParseJson(result.response.text());
     return data.questions || [];
-  } catch (error) {
-    console.error('Error generating more rhetorical quiz questions:', error);
-    throw new Error('Failed to generate more rhetorical quiz questions.');
-  }
+  });
 };
 
 export const generateMoreRhetoricalPassage = async (
@@ -630,10 +548,8 @@ export const generateMoreRhetoricalPassage = async (
   difficulty: 'easy' | 'medium' | 'hard' | 'custom' = 'medium',
   customTopic: string = ''
 ): Promise<RhetoricalPassageData> => {
-  try {
-    const API_KEY = getAPIKey();
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
+  return globalKeyPool.executeWithRotation(async (genAI) => {
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
     const termsString = termsList.join(', ');
 
     let theme = customTopic ? `on the theme of ${customTopic}` : 'addressing a pressing civic or ethical dilemma';
@@ -653,11 +569,7 @@ export const generateMoreRhetoricalPassage = async (
       ]
     }`;
 
-    const result = await retryAPICall(() => model.generateContent(prompt));
-    const data = extractAndParseJson(result.response.text());
-    return data;
-  } catch (error) {
-    console.error('Error generating new rhetorical passage:', error);
-    throw new Error('Failed to generate a new rhetorical passage.');
-  }
+    const result = await model.generateContent(prompt);
+    return extractAndParseJson(result.response.text());
+  });
 };

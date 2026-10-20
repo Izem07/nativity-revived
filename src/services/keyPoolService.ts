@@ -39,10 +39,18 @@ export class KeyPool {
       loaded.unshift(single.trim());
     }
 
-    // Check env vars
+    // Check env vars - single key
     const envKey = import.meta.env.VITE_GEMINI_API_KEY as string;
     if (envKey && envKey !== 'your_api_key_here' && !loaded.includes(envKey.trim())) {
       loaded.push(envKey.trim());
+    }
+
+    // Check env vars - numbered pool keys (VITE_GEMINI_API_KEY_1 through _5)
+    for (let i = 1; i <= 5; i++) {
+      const numberedKey = (import.meta.env as Record<string, string>)[`VITE_GEMINI_API_KEY_${i}`];
+      if (numberedKey && numberedKey.trim() && numberedKey !== 'your_api_key_here' && !loaded.includes(numberedKey.trim())) {
+        loaded.push(numberedKey.trim());
+      }
     }
 
     this.keys = loaded;
@@ -139,26 +147,29 @@ export class KeyPool {
       } catch (err: any) {
         lastError = err;
         const errMsg = String(err?.message || err);
-        const isRateLimit =
+        const isRateLimitOrOverload =
           errMsg.includes('429') ||
+          errMsg.includes('503') ||
           errMsg.includes('RESOURCE_EXHAUSTED') ||
           errMsg.includes('Quota exceeded') ||
+          errMsg.includes('high demand') ||
+          errMsg.includes('temporarily unavailable') ||
           errMsg.includes('rate limit') ||
           errMsg.includes('403');
 
-        if (isRateLimit && this.keys.length > 1) {
-          console.warn(`[KeyPool] Key ${this.currentIndex + 1} exhausted. Rotating to next pool key...`);
+        if (isRateLimitOrOverload && this.keys.length > 1) {
+          console.warn(`[KeyPool] Key ${this.currentIndex + 1} hit rate-limit or 503 high demand. Rotating to next pool key...`);
           this.rotateKey();
           attempts++;
           await new Promise((r) => setTimeout(r, 1200));
           continue;
         }
 
-        if (isRateLimit) {
-          // Single key rate limit
+        if (isRateLimitOrOverload) {
+          // Single key rate limit or 503 high demand
           attempts++;
-          console.warn(`[KeyPool] Rate limit encountered on sole key. Pausing before retry attempt ${attempts}/${retries}...`);
-          await new Promise((r) => setTimeout(r, 2000 * attempts));
+          console.warn(`[KeyPool] Temporary high demand (503) or rate limit. Retrying in ${1.5 * attempts}s (attempt ${attempts}/${retries})...`);
+          await new Promise((r) => setTimeout(r, 1500 * attempts));
           continue;
         }
 
