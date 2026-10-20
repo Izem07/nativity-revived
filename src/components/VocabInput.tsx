@@ -16,12 +16,13 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 
-import { generateQuizContent, QuizGenerationResult } from '../services/geminiService';
+import { generateQuizContent, QuizGenerationResult, getStoredAPIKey } from '../services/geminiService';
 import { getCachedResult, setCachedResult } from '../services/cacheService';
 
 interface VocabInputProps {
   onGenerate: (result: QuizGenerationResult, vocabList: string[]) => void;
   onLoadingChange: (isLoading: boolean) => void;
+  onOpenApiKeyModal?: () => void;
 }
 
 const MIN_WORD_NUMBER_DIGITS = 2;
@@ -53,7 +54,7 @@ const PRE_FILLED_LISTS = [
   },
 ] as const;
 
-export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
+export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: VocabInputProps) {
   const [vocabList, setVocabList] = useState<string[]>(['']);
   const [error, setError] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('GEMINI_API_KEY') ?? '');
@@ -167,6 +168,12 @@ export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
       setError('Please enter no more than 50 vocabulary words.');
       return;
     }
+    if (!getStoredAPIKey()) {
+      if (onOpenApiKeyModal) {
+        onOpenApiKeyModal();
+        return;
+      }
+    }
     setPendingWords(normalized);
     setConfirmGenerateOpen(true);
   };
@@ -230,21 +237,7 @@ export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
         <Typography variant="body1" align="center" sx={{ mt: 1, color: 'text.secondary', maxWidth: 720, mx: 'auto' }}>
           Add <strong>3–50 vocabulary words</strong> and we’ll craft <strong>flashcards, quizzes, matching games</strong>, and <em>paragraph practice</em> tailored to your study goals.
         </Typography>
-        <Alert severity="warning" icon={<Info className="h-5 w-5" />} sx={{ mt: 3, mx: 'auto', maxWidth: 800, border: '1px solid rgba(245, 158, 11, 0.3)', bgcolor: 'rgba(255, 251, 235, 0.05)' }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'warning.main', mb: 0.5 }}>
-            A New Chapter Begins! We're Moving!
-          </Typography>
-          <Typography variant="body2" color="text.primary">
-            Our app is embarking on an exciting journey to a new home! To continue enjoying all its features, please join us at:
-            <br />
-            <a href="https://nativity.pyintel.online/" target="_blank" rel="noopener noreferrer" className="font-bold text-blue-600 underline hover:text-blue-800">https://nativity.pyintel.online/</a> or <a href="https://nativity.pages.dev/" target="_blank" rel="noopener noreferrer" className="font-bold text-blue-600 underline hover:text-blue-800">https://nativity.pages.dev/</a>
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-            Mark your calendars! After <strong>December 3rd</strong>, this old address (nativity-sage.vercel.app) will close its doors. Don't forget to update your bookmarks for a seamless transition!
-          </Typography>
-        </Alert>
-
-        <Alert severity="info" icon={<ShieldCheck className="h-5 w-5" />} sx={{ mt: 2, mx: 'auto', maxWidth: 800, bgcolor: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
+<Alert severity="info" icon={<ShieldCheck className="h-5 w-5" />} sx={{ mt: 2, mx: 'auto', maxWidth: 800, bgcolor: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
           <Typography variant="caption" sx={{ display: 'block', color: 'text.primary', fontWeight: 500 }}>
             Created by a high school student for students.
           </Typography>
@@ -403,40 +396,15 @@ export function VocabInput({ onGenerate, onLoadingChange }: VocabInputProps) {
             </Box>
           </Box>
 
-          <Button variant="outlined" startIcon={<KeyRound />} onClick={() => setShowApiPanel((prev) => !prev)}>
-            Configure Gemini API key (optional)
+          <Button
+            variant="outlined"
+            startIcon={<KeyRound />}
+            onClick={onOpenApiKeyModal}
+            color={getStoredAPIKey() ? 'success' : 'primary'}
+          >
+            {getStoredAPIKey() ? '✓ Gemini API Key Configured' : 'Connect Gemini API Key (Free)'}
           </Button>
         </Paper>
-
-        <Collapse in={showApiPanel} timeout={200}>
-          <Paper sx={{ p: 2, mt: 2 }} elevation={2}>
-            <Typography variant="caption" sx={{ fontWeight: 700 }}>Google Gemini API key</Typography>
-            <TextField
-              id="api-key"
-              type="password"
-              value={apiKey}
-              onChange={(event) => handleApiKeyChange(event.target.value)}
-              placeholder="Enter your API key (starts with AIza...)"
-              variant="outlined"
-              size="small"
-              fullWidth
-              sx={{ mt: 1 }}
-            />
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
-              <Button variant="contained" size="small" onClick={handleSaveApiKey} disabled={!apiKey.trim()}>
-                Save Key
-              </Button>
-              {apiKeySaved && (
-                <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>
-                  ✓ Key saved!
-                </Typography>
-              )}
-            </Stack>
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              Get a free key (no billing needed) at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">Google AI Studio</a>. Keys start with <strong>AIza</strong>.
-            </Typography>
-          </Paper>
-        </Collapse>
 
         <Paper variant="outlined" sx={{ p: 2, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
           <Box>

@@ -4,20 +4,24 @@ import { MatchingPair } from '../components/Matching';
 import { ParagraphData } from '../components/ParagraphPractice';
 import { QuizQuestion } from '../components/Quiz';
 
-// Initialize the Gemini API
-const getAPIKey = () => {
-  // First check localStorage (user provided key)
+export const getStoredAPIKey = (): string => {
   const storedKey = localStorage.getItem('GEMINI_API_KEY');
   if (storedKey && storedKey.trim()) {
     return storedKey.trim();
   }
 
-  // Then check environment variable
   const envKey = import.meta.env.VITE_GEMINI_API_KEY as string;
   if (envKey && envKey !== 'your_api_key_here') {
-    return envKey;
+    return envKey.trim();
   }
 
+  return '';
+};
+
+// Initialize the Gemini API
+export const getAPIKey = () => {
+  const key = getStoredAPIKey();
+  if (key) return key;
   throw new Error('Please provide a valid Google Gemini API key');
 };
 
@@ -187,15 +191,16 @@ export const generateQuizContent = async (vocabularyList: string[]): Promise<Qui
   }
 };
 
-export const testAPIKey = async () => {
+export const testAPIKey = async (candidateKey?: string): Promise<{ valid: boolean; error?: string }> => {
   try {
-    const API_KEY = getAPIKey();
-    const genAI = new GoogleGenerativeAI(API_KEY);
+    const key = candidateKey ? candidateKey.trim() : getStoredAPIKey();
+    if (!key) return { valid: false, error: 'No API key provided' };
+    const genAI = new GoogleGenerativeAI(key);
     const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
-    const result = await model.generateContent('Hello');
-    return result.response.text() !== '';
-  } catch {
-    return false;
+    const result = await model.generateContent('ping');
+    return { valid: Boolean(result.response.text()) };
+  } catch (err: any) {
+    return { valid: false, error: err?.message || 'Invalid API Key' };
   }
 };
 
@@ -385,3 +390,274 @@ export const generateHangmanWords = async (
   }
 };
 
+
+
+// ==========================================
+// RHETORICAL TERMS & DEVICES EXTENSION
+// ==========================================
+
+export interface RhetoricalFlashcardItem {
+  term: string;
+  definition: string;
+  rhetoricalEffect: string;
+  exampleSentence: string;
+  historicExample: string;
+  etymology?: string;
+  mnemonic: string;
+}
+
+export interface RhetoricalDistractorSentence {
+  sentence: string;
+  deviceOrReason: string;
+}
+
+export interface RhetoricalSentenceItem {
+  term: string;
+  targetSentence: string;
+  keyFeature: string;
+  explanation: string;
+  distractorSentences: RhetoricalDistractorSentence[];
+}
+
+export interface RhetoricalQuizQuestion {
+  question: string;
+  options: string[];
+  correct: number;
+  term: string;
+  explanation: string;
+}
+
+export interface RhetoricalPassageQuestion {
+  question: string;
+  answer: string;
+}
+
+export interface RhetoricalPassageData {
+  passage: string;
+  devicesUsed?: string[];
+  questions: RhetoricalPassageQuestion[];
+}
+
+export interface RhetoricalGenerationResult {
+  flashcards: RhetoricalFlashcardItem[];
+  sentenceMatches: RhetoricalSentenceItem[];
+  quiz: RhetoricalQuizQuestion[];
+  passage: RhetoricalPassageData;
+}
+
+export const generateRhetoricalContent = async (termsList: string[]): Promise<RhetoricalGenerationResult> => {
+  try {
+    const API_KEY = getAPIKey();
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
+
+    const termsString = termsList.join(', ');
+
+    // 1. Rhetorical Flashcards
+    const flashcardPrompt = `Create comprehensive AP Language & Composition flashcards for these rhetorical terms/devices: ${termsString}.
+    
+    IMPORTANT: Provide ALL of the following fields for each term:
+    1. "term": Exact rhetorical device name
+    2. "definition": Clear, precise definition
+    3. "rhetoricalEffect": Why an author/speaker uses this device (persuasive impact, tone, cadence, emotional appeal)
+    4. "exampleSentence": A clear modern example sentence illustrating the device
+    5. "historicExample": A famous literary, historical, or oratorical quote demonstrating this device (attribute author/speaker)
+    6. "etymology": Greek/Latin root or linguistic origin
+    7. "mnemonic": A memorable memory trick, rhyme, or visual association
+    
+    Format as JSON:
+    {
+      "flashcards": [
+        {
+          "term": "Anaphora",
+          "definition": "The repetition of a word or phrase at the beginning of successive clauses.",
+          "rhetoricalEffect": "Builds rhythmic momentum, emotional intensity, and emphasizes a central theme.",
+          "exampleSentence": "We will stand together, we will fight together, and we will win together.",
+          "historicExample": "I have a dream... I have a dream today. (Martin Luther King Jr.)",
+          "etymology": "Greek: ana- (again) + pherein (to carry)",
+          "mnemonic": "Anaphora = A New phrase starting every line again."
+        }
+      ]
+    }`;
+
+    // 2. Sentence Guessing & Matching items:
+    // "instead of matching you have to guess which sentence matches with the provided rhetorical terms you want to study"
+    const sentenceMatchPrompt = `Create sentence guessing challenges for these AP Lang rhetorical terms: ${termsString}.
+    For EACH term, generate:
+    1. "term": The rhetorical device name
+    2. "targetSentence": A rich, vivid sentence that clearly and unquestionably demonstrates this specific rhetorical device.
+    3. "keyFeature": The specific phrase or syntactic pattern in the sentence that creates this device (e.g., "reversal of words A-B into B-A" or "deliberate omission of conjunctions").
+    4. "explanation": A detailed, educational explanation of why this sentence matches the device and how it creates its rhetorical effect.
+    5. "distractorSentences": Exactly 3 well-crafted sentences that DO NOT use this device (they should each use a different rhetorical device or normal grammar), each with a brief "deviceOrReason" explaining why it is NOT the target device (e.g. "Uses metaphor rather than anaphora").
+    
+    Format as JSON:
+    {
+      "sentenceMatches": [
+        {
+          "term": "Chiasmus",
+          "targetSentence": "Let us never negotiate out of fear, but let us never fear to negotiate.",
+          "keyFeature": "reversal of words 'negotiate out of fear' into 'fear to negotiate' (A-B-B-A structure)",
+          "explanation": "Chiasmus reverses the grammatical structure or words in successive phrases to highlight contrast and balance.",
+          "distractorSentences": [
+            {
+              "sentence": "He was a lion in battle, fierce and untamed.",
+              "deviceOrReason": "This is a metaphor comparing courage to a lion, not chiasmus."
+            },
+            {
+              "sentence": "I came, I saw, I conquered.",
+              "deviceOrReason": "This is asyndeton/tricolon (rapid listing without conjunctions), not chiasmus."
+            },
+            {
+              "sentence": "The wind howled through the empty corridors all night.",
+              "deviceOrReason": "This is personification giving human traits to the wind, not chiasmus."
+            }
+          ]
+        }
+      ]
+    }`;
+
+    // 3. AP Lang Multiple Choice Quiz
+    const quizPrompt = `Create 10 AP Language & Composition style multiple choice questions testing these rhetorical terms: ${termsString}.
+    Each question should present a quote, excerpt, or scenario and ask students to identify the rhetorical device or analyze its rhetorical function.
+    
+    Format as JSON:
+    {
+      "questions": [
+        {
+          "question": "In the excerpt: '...', which rhetorical device is predominantly utilized to heighten the speaker's urgency?",
+          "options": ["Option A", "Option B", "Option C", "Option D"],
+          "correct": 0,
+          "term": "term name",
+          "explanation": "Detailed explanation of why this is correct."
+        }
+      ]
+    }`;
+
+    // 4. Rhetorical Analysis Passage
+    const passagePrompt = `Write an eloquent, cohesive persuasive speech or essay passage (175-250 words) that naturally employs several of these rhetorical devices: ${termsString}.
+    Bold the devices used in the text like **[Device: excerpt]** or **excerpt (Device)**.
+    Provide 3-4 AP Lang style rhetorical analysis prompts analyzing how the speaker uses rhetorical devices to achieve their purpose, with model analytical answers.
+    
+    Format as JSON:
+    {
+      "passage": "Full passage text...",
+      "devicesUsed": ["Anaphora", "Chiasmus", "Polysyndeton"],
+      "questions": [
+        {
+          "question": "How does the speaker's use of anaphora in paragraph 1 reinforce their call to action?",
+          "answer": "The repeated opening creates a rhythmic urgency that unites the listeners..."
+        }
+      ]
+    }`;
+
+    // Execute requests in parallel with retries
+    const [flashcardResult, sentenceMatchResult, quizResult, passageResult] = await Promise.all([
+      retryAPICall(() => model.generateContent(flashcardPrompt)),
+      retryAPICall(() => model.generateContent(sentenceMatchPrompt)),
+      retryAPICall(() => model.generateContent(quizPrompt)),
+      retryAPICall(() => model.generateContent(passagePrompt))
+    ]);
+
+    const flashcardData = extractAndParseJson(flashcardResult.response.text());
+    const sentenceMatchData = extractAndParseJson(sentenceMatchResult.response.text());
+    const quizData = extractAndParseJson(quizResult.response.text());
+    const passageData = extractAndParseJson(passageResult.response.text());
+
+    return {
+      flashcards: flashcardData.flashcards || [],
+      sentenceMatches: sentenceMatchData.sentenceMatches || [],
+      quiz: quizData.questions || [],
+      passage: passageData
+    };
+  } catch (error) {
+    console.error('Error generating rhetorical content:', error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to generate rhetorical study content. Please check your API key and try again.');
+  }
+};
+
+export const generateMoreRhetoricalQuizQuestions = async (
+  termsList: string[],
+  difficulty: 'easy' | 'medium' | 'hard' | 'custom' = 'medium',
+  customTopic: string = ''
+): Promise<RhetoricalQuizQuestion[]> => {
+  try {
+    const API_KEY = getAPIKey();
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
+    const termsString = termsList.join(', ');
+
+    let instruction = '';
+    if (difficulty === 'easy') {
+      instruction = 'Provide straightforward examples with obvious syntactic patterns.';
+    } else if (difficulty === 'medium') {
+      instruction = 'Provide authentic-feeling literary/speech excerpts with plausible distractors.';
+    } else if (difficulty === 'hard') {
+      instruction = 'Provide complex, nuanced excerpts where distinguishing between subtle rhetorical devices requires deep AP Lang analysis.';
+    } else if (difficulty === 'custom' && customTopic) {
+      instruction = `Focus the questions and excerpts around: ${customTopic}`;
+    }
+
+    const prompt = `Create 5 AP Lang multiple choice questions for these rhetorical terms: ${termsString}.
+    ${instruction}
+    
+    Format as JSON:
+    {
+      "questions": [
+        {
+          "question": "question text",
+          "options": ["opt1", "opt2", "opt3", "opt4"],
+          "correct": 0,
+          "term": "term name",
+          "explanation": "explanation text"
+        }
+      ]
+    }`;
+
+    const result = await retryAPICall(() => model.generateContent(prompt));
+    const data = extractAndParseJson(result.response.text());
+    return data.questions || [];
+  } catch (error) {
+    console.error('Error generating more rhetorical quiz questions:', error);
+    throw new Error('Failed to generate more rhetorical quiz questions.');
+  }
+};
+
+export const generateMoreRhetoricalPassage = async (
+  termsList: string[],
+  difficulty: 'easy' | 'medium' | 'hard' | 'custom' = 'medium',
+  customTopic: string = ''
+): Promise<RhetoricalPassageData> => {
+  try {
+    const API_KEY = getAPIKey();
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
+    const termsString = termsList.join(', ');
+
+    let theme = customTopic ? `on the theme of ${customTopic}` : 'addressing a pressing civic or ethical dilemma';
+    const prompt = `Write an eloquent AP Lang style speech or essay excerpt (175-250 words) ${theme} that incorporates these rhetorical devices: ${termsString}.
+    Bold the devices when used like **[Device: excerpt]** or **excerpt (Device)**.
+    Include 3-4 AP Lang rhetorical analysis questions with model answers.
+    
+    Format as JSON:
+    {
+      "passage": "passage text...",
+      "devicesUsed": ["..."],
+      "questions": [
+        {
+          "question": "question text",
+          "answer": "model answer"
+        }
+      ]
+    }`;
+
+    const result = await retryAPICall(() => model.generateContent(prompt));
+    const data = extractAndParseJson(result.response.text());
+    return data;
+  } catch (error) {
+    console.error('Error generating new rhetorical passage:', error);
+    throw new Error('Failed to generate a new rhetorical passage.');
+  }
+};
