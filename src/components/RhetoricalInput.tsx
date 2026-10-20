@@ -123,7 +123,7 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
     setCacheDialogOpen(false);
     const cached = getCachedRhetoricalResult(pendingTerms);
     if (cached) {
-      onGenerate(cached, pendingTerms);
+      onGenerate(cached.data, cached.terms);
       onLoadingChange(false);
     }
     setPendingTerms([]);
@@ -198,7 +198,7 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
                       : 'border-zinc-200 dark:border-white/[0.06] bg-zinc-50 dark:bg-white/[0.02] text-zinc-700 dark:text-zinc-300 hover:border-emerald-500/40'
                   }`}
                 >
-                  <div className="text-xs font-semibold truncate">{unit.title}</div>
+                  <div className="text-xs font-semibold truncate">{unit.unitTitle}</div>
                   <div className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate mt-0.5">
                     {unit.terms.length} devices
                   </div>
@@ -217,7 +217,7 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
                 className="mt-4 p-5 rounded-2xl bg-zinc-100 dark:bg-zinc-950/60 border border-zinc-200 dark:border-white/[0.08] space-y-3"
               >
                 <div className="font-serif text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                  {activeUnit.title} — Teacher PPT Notes
+                  {activeUnit.unitTitle} — Teacher PPT Notes
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   {activeUnit.termsDetailed.map((td) => (

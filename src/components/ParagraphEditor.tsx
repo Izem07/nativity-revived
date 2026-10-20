@@ -10,12 +10,20 @@ interface ParagraphEditorProps {
   words: string[];
 }
 
-interface ParagraphPart {
-  type: 'blank' | 'text';
-  id: number | string;
+interface BlankParagraphPart {
+  type: 'blank';
+  id: number;
   content: React.ReactNode;
-  correctWord?: string;
+  correctWord: string;
 }
+
+interface TextParagraphPart {
+  type: 'text';
+  id: string;
+  content: React.ReactNode;
+}
+
+type ParagraphPart = BlankParagraphPart | TextParagraphPart;
 
 export function ParagraphEditor({ paragraph, words }: ParagraphEditorProps) {
   // Add touch event handling
@@ -24,7 +32,7 @@ export function ParagraphEditor({ paragraph, words }: ParagraphEditorProps) {
   const [wordBank, setWordBank] = useState(() => words.sort(() => Math.random() - 0.5));
   const [showResults, setShowResults] = useState(false);
 
-  const paragraphParts = useMemo(() => {
+  const paragraphParts = useMemo<ParagraphPart[]>(() => {
     const parts = paragraph.split(/(\*\*[^*]+\*\*)/g);
     let blankIndex = 0;
     return parts.map((part, index) => {
@@ -157,7 +165,7 @@ export function ParagraphEditor({ paragraph, words }: ParagraphEditorProps) {
 
   const correctCount = useMemo(() => {
     if (!showResults) return 0;
-    return paragraphParts.filter(p => p.type === 'blank' && p.correctWord === droppedWords[p.id]).length;
+    return paragraphParts.filter((p): p is BlankParagraphPart => p.type === 'blank').filter(p => p.correctWord === droppedWords[p.id]).length;
   }, [showResults, droppedWords, paragraphParts]);
 
   return (
@@ -187,9 +195,9 @@ export function ParagraphEditor({ paragraph, words }: ParagraphEditorProps) {
                 draggable
                 onClick={() => {
                   // Find first empty blank
-                  const firstEmptyIndex = paragraphParts.find(
-                    p => p.type === 'blank' && !droppedWords[p.id]
-                  )?.id as number | undefined;
+                  const firstEmptyIndex = (paragraphParts.filter((p): p is BlankParagraphPart => p.type === 'blank').find(
+                    p => !droppedWords[p.id]
+                  ))?.id;
                   
                   if (firstEmptyIndex !== undefined) {
                     const indexInBank = wordBank.indexOf(word);
@@ -201,7 +209,7 @@ export function ParagraphEditor({ paragraph, words }: ParagraphEditorProps) {
                     }
                   }
                 }}
-                onDragStart={(e: React.DragEvent) => handleDragStart(word, 'bank', e)}
+                onDragStart={(e: any) => handleDragStart(word, 'bank', e)}
                 className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white dark:bg-slate-800 shadow-md cursor-pointer active:scale-95 text-sm font-semibold text-slate-700 dark:text-slate-200 select-none transition-transform touch-manipulation"
               >
                 {word}

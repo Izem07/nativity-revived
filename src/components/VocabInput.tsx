@@ -152,7 +152,7 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
     setCacheDialogOpen(false);
     const cached = getCachedResult(pendingWords);
     if (cached) {
-      onGenerate(cached, pendingWords);
+      onGenerate(cached.data, cached.words);
       onLoadingChange(false);
     }
     setPendingWords([]);
