@@ -204,7 +204,7 @@ function App() {
                   } ${
                     isHome
                       ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-white/50 dark:hover:bg-white/[0.05]'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-zinc-200/70 dark:hover:bg-white/[0.05]'
                   }`}
                 >
                   <Flame className="h-3.5 w-3.5" />
@@ -219,7 +219,7 @@ function App() {
                   } ${
                     isVocab
                       ? 'bg-brand-600 text-white shadow-sm'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/[0.05]'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/70 dark:hover:bg-white/[0.05]'
                   }`}
                 >
                   <BookOpen className="h-3.5 w-3.5" />
@@ -234,7 +234,7 @@ function App() {
                   } ${
                     isAnalogy
                       ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-sm'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/[0.05]'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/70 dark:hover:bg-white/[0.05]'
                   }`}
                 >
                   <Layers className="h-3.5 w-3.5" />
@@ -249,7 +249,7 @@ function App() {
                   } ${
                     isRhetoric
                       ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/[0.05]'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/70 dark:hover:bg-white/[0.05]'
                   }`}
                 >
                   <Feather className="h-3.5 w-3.5" />
@@ -264,7 +264,7 @@ function App() {
                   } ${
                     isPassage
                       ? 'bg-amber-500 text-zinc-950 font-bold shadow-sm'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/[0.05]'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/70 dark:hover:bg-white/[0.05]'
                   }`}
                 >
                   <Scroll className="h-3.5 w-3.5" />

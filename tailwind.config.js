@@ -35,9 +35,13 @@ export default {
         'glow-amber': '0 0 40px -10px rgba(245, 158, 11, 0.25)',
         'glow-emerald': '0 0 40px -10px rgba(16, 185, 129, 0.25)',
         'glow-violet': '0 0 40px -10px rgba(139, 92, 246, 0.25)',
+        'glow-rose': '0 0 40px -10px rgba(244, 63, 94, 0.20)',
+        card: 'var(--shadow-card)',
+        'card-hover': 'var(--shadow-card-hover)',
       },
       backgroundImage: {
-        'noise': "radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 0)",
+        /* neutral tiny dots — visible on both dark (white dots) and light (dark dots) */
+        'noise': "radial-gradient(rgba(100, 116, 139, 0.06) 1px, transparent 0)",
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
       },
     },

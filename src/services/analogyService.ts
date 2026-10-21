@@ -162,7 +162,7 @@ export async function lookupWordDefinition(rawQuery: string): Promise<WordDefini
 
   // 5. Fallback to Gemini with rotating keys
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
-    const model = genAI.getGenerativeModel({ model: fallbackModel || 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: fallbackModel || 'gemini-2.0-flash' });
     const prompt = `Provide a concise dictionary definition for "${targetWord}".
 Return ONLY JSON:
 {
@@ -254,7 +254,7 @@ export async function bulkPreloadDefinitions(
   if (unresolved.length > 0) {
     try {
       await globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
-        const model = genAI.getGenerativeModel({ model: fallbackModel || 'gemini-2.5-flash' });
+        const model = genAI.getGenerativeModel({ model: fallbackModel || 'gemini-2.0-flash' });
         const prompt = `Provide concise collegiate dictionary definitions for each of these words: ${JSON.stringify(unresolved)}.
 Return ONLY a JSON array of objects with schema:
 [
@@ -393,7 +393,7 @@ export async function generateAnalogies(
 
   const questions = await globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
     const model = genAI.getGenerativeModel({
-      model: fallbackModel || 'gemini-2.5-flash',
+      model: fallbackModel || 'gemini-2.0-flash',
       generationConfig: {
         temperature: 0.85,
         topP: 0.95,

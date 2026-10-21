@@ -4,15 +4,18 @@
 
 @layer base {
   :root {
-    --bg-page: #f8fafc;
+    /* Light mode — premium slate with warm white cards */
+    --bg-page: #eef2f7;
     --text-primary: #0f172a;
-    --text-muted: #64748b;
-    --border-subtle: rgba(0, 0, 0, 0.08);
-    --border-hover: rgba(0, 0, 0, 0.16);
-    --card-bg: rgba(255, 255, 255, 0.85);
+    --text-muted: #475569;
+    --border-subtle: rgba(15, 23, 42, 0.09);
+    --border-hover: rgba(15, 23, 42, 0.22);
+    --card-bg: rgba(255, 255, 255, 0.96);
     --card-solid: #ffffff;
-    --inner-highlight: rgba(255, 255, 255, 0.8);
-    --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+    --inner-highlight: rgba(255, 255, 255, 1);
+    --shadow-card: 0 4px 24px -4px rgba(15, 23, 42, 0.10), 0 1px 4px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(15, 23, 42, 0.06);
+    --shadow-card-hover: 0 12px 32px -6px rgba(15, 23, 42, 0.14), 0 2px 8px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.08);
+    --accent-stripe: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
   }
 
   .dark {
@@ -25,6 +28,8 @@
     --card-solid: #121217;
     --inner-highlight: rgba(255, 255, 255, 0.06);
     --shadow-card: 0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+    --shadow-card-hover: 0 28px 50px -15px rgba(0, 0, 0, 0.8), 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+    --accent-stripe: none;
   }
 
   body {
@@ -60,10 +65,19 @@
   box-shadow: var(--shadow-card);
 }
 
+/* Light mode: stronger card depth */
+:root:not(.dark) .card-glass {
+  border-color: rgba(15, 23, 42, 0.09);
+  box-shadow: var(--shadow-card);
+}
+
 .card-glass-hover {
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .card-glass-hover:hover {
   border-color: var(--border-hover);
+  box-shadow: var(--shadow-card-hover);
   transform: translateY(-2px);
 }
+
+
