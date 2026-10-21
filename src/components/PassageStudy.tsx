@@ -192,7 +192,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
           <h2 className="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-700 via-amber-900 to-amber-800 dark:from-amber-200 dark:via-yellow-100 dark:to-amber-400 font-serif tracking-tight">
             Passage Rhetorical Study & Analysis
           </h2>
-          <p className="text-sm text-zinc-600 dark:text-zinc-700 dark:text-amber-200/80 max-w-2xl leading-relaxed">
+          <p className="text-sm text-zinc-600 dark:text-amber-200/80 max-w-2xl leading-relaxed">
             Deconstruct iconic speeches and essays with automated <strong>SOAPSTone breakdowns</strong>, <strong>structural lines of reasoning</strong>, <strong>rhetorical device logs</strong>, and <strong>AP-style MCQs</strong>.
           </p>
         </div>
@@ -253,11 +253,11 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
                   className={`p-4 rounded-2xl border cursor-pointer transition-all ${
                     isSelected
                       ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-500 dark:border-amber-400/80 shadow-md shadow-amber-500/10 ring-1 ring-amber-400/50'
-                      : 'bg-white dark:bg-white dark:bg-slate-900/80 border-zinc-200 dark:border-slate-800 hover:border-amber-500/40'
+                      : 'bg-white dark:bg-slate-900/80 border-zinc-200 dark:border-slate-800 hover:border-amber-500/40'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-amber-800 dark:text-zinc-700 dark:text-amber-200 font-serif">
+                    <span className="text-xs font-bold text-amber-800 dark:text-amber-200 font-serif">
                       {preset.author}
                     </span>
                     <span className="text-[10px] text-amber-600 dark:text-amber-400/70 font-mono">{preset.year}</span>
@@ -272,7 +272,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
           </div>
 
           {/* Linked Study Focus Banner */}
-          <div className="p-4 rounded-2xl bg-white dark:bg-white dark:bg-slate-900/90 border border-amber-500/20 space-y-2.5 shadow-sm">
+          <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/90 border border-amber-500/20 space-y-2.5 shadow-sm">
             <div className="flex items-center justify-between text-xs font-bold text-amber-800 dark:text-amber-300">
               <span className="flex items-center gap-1.5">
                 <Compass className="h-3.5 w-3.5 text-amber-400" /> Linked Targets
@@ -358,7 +358,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
           className="space-y-6 pt-4"
         >
           {/* Packet Top Bar & Tab Navigation */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-white dark:bg-slate-900/90 border border-amber-500/30 shadow-xl backdrop-blur">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-slate-900/90 border border-amber-500/30 shadow-xl backdrop-blur">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-400/20 to-yellow-500/20 border border-amber-400/30">
                 <Scroll className="h-5 w-5 text-amber-300" />
