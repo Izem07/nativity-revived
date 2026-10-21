@@ -171,6 +171,45 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
     return Array.from(set);
   };
 
+  // Extract words for only the current question (saving network calls and AI credits)
+  const getCurrentQuestionWords = (): string[] => {
+    if (!currentQ) return [];
+    const set = new Set<string>();
+    if (Array.isArray(currentQ.pair)) {
+      if (currentQ.pair[0]) set.add(currentQ.pair[0]);
+      if (currentQ.pair[1]) set.add(currentQ.pair[1]);
+    }
+    if (Array.isArray(currentQ.choices)) {
+      for (const c of currentQ.choices) {
+        if (Array.isArray(c)) {
+          if (c[0]) set.add(c[0]);
+          if (c[1]) set.add(c[1]);
+        }
+      }
+    }
+    return Array.from(set);
+  };
+
+  const handleBulkPreloadQuestion = async () => {
+    const qWords = getCurrentQuestionWords();
+    if (qWords.length === 0) return;
+
+    setIsBulkLoading(true);
+    setBulkProgress({ loaded: 0, total: qWords.length });
+    try {
+      const defs = await bulkPreloadDefinitions(qWords, (loaded, total) => {
+        setBulkProgress({ loaded, total });
+      });
+      setBulkDefinitions((prev) => ({ ...prev, ...defs }));
+      setShowVocabDrawer(true);
+    } catch (e) {
+      console.error('Failed preload question:', e);
+    } finally {
+      setIsBulkLoading(false);
+      setBulkProgress(null);
+    }
+  };
+
   const handleBulkPreload = async () => {
     const allWords = getAllSetWords();
     if (allWords.length === 0) return;
@@ -448,7 +487,19 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
             <span className="font-mono">{streak} Streak</span>
           </div>
 
-          {/* Mass Load Dictionary / Vocabulary Index Button */}
+          {/* Question-Level Quick Define / Bulk Load Button */}
+          <button
+            onClick={handleBulkPreloadQuestion}
+            disabled={isBulkLoading}
+            className="text-xs text-rose-700 dark:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all font-semibold active:scale-95 disabled:opacity-50"
+            title="Load definitions only for current question to conserve API credits"
+          >
+            <BookA className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+            <span className="hidden sm:inline">Define Question</span>
+            <span className="sm:hidden">Q-Dict</span>
+          </button>
+
+          {/* Mass Load All Dictionary / Vocabulary Index Button */}
           <button
             onClick={handleBulkPreload}
             disabled={isBulkLoading}
@@ -466,7 +517,7 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
               <>
                 <Library className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
                 <span className="hidden sm:inline">Mass Load Dict</span>
-                <span className="sm:hidden">Dict</span>
+                <span className="sm:hidden">All Dict</span>
               </>
             )}
           </button>

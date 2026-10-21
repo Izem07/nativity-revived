@@ -49,8 +49,8 @@ const extractAndParseJson = (text: string) => {
 };
 
 export const generateQuizContent = async (vocabularyList: string[]): Promise<QuizGenerationResult> => {
-  return globalKeyPool.executeWithRotation(async (genAI) => {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
+  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const vocabString = vocabularyList.join(', ');
 
     // Generate Quiz Questions
@@ -159,7 +159,7 @@ export const testAPIKey = async (candidateKey?: string): Promise<{ valid: boolea
     const key = candidateKey ? candidateKey.trim() : getStoredAPIKey();
     if (!key) return { valid: false, error: 'No API key provided' };
     const genAI = new GoogleGenerativeAI(key);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const result = await model.generateContent('ping');
     return { valid: Boolean(result.response.text()) };
   } catch (err: any) {
@@ -179,8 +179,8 @@ export const generateMoreQuizQuestions = async (
   difficulty: 'easy' | 'medium' | 'hard' | 'custom' = 'medium',
   customTopic: string = ''
 ): Promise<QuizQuestion[]> => {
-  return globalKeyPool.executeWithRotation(async (genAI) => {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
+  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const vocabString = vocabularyList.join(', ');
 
     let difficultyInstruction = '';
@@ -225,8 +225,8 @@ export const generateMoreParagraph = async (
   difficulty: 'easy' | 'medium' | 'hard' | 'custom' = 'medium',
   customTopic: string = ''
 ): Promise<ParagraphData> => {
-  return globalKeyPool.executeWithRotation(async (genAI) => {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
+  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const vocabString = vocabularyList.join(', ');
 
     let difficultyInstruction = '';
@@ -273,8 +273,8 @@ export const generateHangmanWords = async (
   count: number,
   difficulty: 'easy' | 'medium' | 'hard' | 'custom'
 ): Promise<FlashcardItem[]> => {
-  return globalKeyPool.executeWithRotation(async (genAI) => {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
+  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     let prompt = '';
     if (difficulty === 'custom') {
@@ -380,8 +380,8 @@ export interface RhetoricalGenerationResult {
 }
 
 export const generateRhetoricalContent = async (termsList: string[]): Promise<RhetoricalGenerationResult> => {
-  return globalKeyPool.executeWithRotation(async (genAI) => {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
+  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const termsString = termsList.join(', ');
 
     // 1. Rhetorical Flashcards
@@ -506,8 +506,8 @@ export const generateMoreRhetoricalQuizQuestions = async (
   difficulty: 'easy' | 'medium' | 'hard' | 'custom' = 'medium',
   customTopic: string = ''
 ): Promise<RhetoricalQuizQuestion[]> => {
-  return globalKeyPool.executeWithRotation(async (genAI) => {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
+  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const termsString = termsList.join(', ');
 
     let instruction = '';
@@ -548,8 +548,8 @@ export const generateMoreRhetoricalPassage = async (
   difficulty: 'easy' | 'medium' | 'hard' | 'custom' = 'medium',
   customTopic: string = ''
 ): Promise<RhetoricalPassageData> => {
-  return globalKeyPool.executeWithRotation(async (genAI) => {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
+  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const termsString = termsList.join(', ');
 
     let theme = customTopic ? `on the theme of ${customTopic}` : 'addressing a pressing civic or ethical dilemma';

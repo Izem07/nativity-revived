@@ -14,7 +14,8 @@ import {
   Scroll,
   Layers,
   Sun,
-  Moon
+  Moon,
+  Flame
 } from 'lucide-react';
 import SplashScreen from './components/SplashScreen';
 import { Flashcards } from './components/Flashcards';
@@ -31,17 +32,18 @@ import { RhetoricalSentenceGame } from './components/RhetoricalSentenceGame';
 import { RhetoricalPassagePractice } from './components/RhetoricalPassagePractice';
 import { PassageStudy } from './components/PassageStudy';
 import { AnalogyQuiz } from './components/AnalogyQuiz';
+import { HomeDashboard } from './components/HomeDashboard';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useTheme } from './theme/ThemeProvider';
 
-type StudySubject = 'vocab' | 'analogy' | 'rhetoric' | 'passage';
+type StudySubject = 'home' | 'vocab' | 'analogy' | 'rhetoric' | 'passage';
 type VocabLearningMode = 'input' | 'flashcards' | 'quiz' | 'matching' | 'paragraph';
 type RhetoricalLearningMode = 'input' | 'flashcards' | 'quiz' | 'sentence-game' | 'passage';
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
-  const [subject, setSubject] = useState<StudySubject>('vocab');
+  const [subject, setSubject] = useState<StudySubject>('home');
   const { resolvedTheme, setTheme } = useTheme();
 
   // API Key State
@@ -89,6 +91,7 @@ function App() {
     return <SplashScreen onComplete={() => setShowSplash(false)} />;
   }
 
+  const isHome = subject === 'home';
   const isVocab = subject === 'vocab';
   const isAnalogy = subject === 'analogy';
   const isRhetoric = subject === 'rhetoric';
@@ -102,6 +105,12 @@ function App() {
 
       {/* Atmospheric Ambient Glows */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden z-0 transition-opacity duration-1000">
+        {isHome && (
+          <>
+            <div className={`absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full ${isDark ? 'bg-rose-600/20' : 'bg-rose-400/10'} blur-[140px]`} />
+            <div className={`absolute top-1/4 -right-40 h-[500px] w-[500px] rounded-full ${isDark ? 'bg-red-500/15' : 'bg-red-300/10'} blur-[140px]`} />
+          </>
+        )}
         {isVocab && (
           <>
             <div className={`absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full ${isDark ? 'bg-brand-600/15' : 'bg-brand-400/10'} blur-[140px]`} />
@@ -136,7 +145,9 @@ function App() {
             <div className="flex items-center gap-3">
               <div
                 className={`relative flex items-center justify-center h-10 w-10 rounded-2xl border transition-all duration-300 shadow-sm ${
-                  isAnalogy
+                  isHome
+                    ? 'border-rose-500/30 bg-rose-500/10 text-rose-500 dark:text-rose-400'
+                    : isAnalogy
                     ? 'border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-300'
                     : isPassage
                     ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300'
@@ -145,7 +156,9 @@ function App() {
                     : 'border-brand-500/30 bg-brand-500/10 text-brand-600 dark:text-brand-300'
                 }`}
               >
-                {isAnalogy ? (
+                {isHome ? (
+                  <Flame className="h-5 w-5" />
+                ) : isAnalogy ? (
                   <Layers className="h-5 w-5" />
                 ) : isPassage ? (
                   <Scroll className="h-5 w-5" />
@@ -165,7 +178,9 @@ function App() {
                   </span>
                 </div>
                 <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
-                  {isAnalogy
+                  {isHome
+                    ? 'Command Center & Exam Blueprint'
+                    : isAnalogy
                     ? 'AP Lang Analogy Review'
                     : isPassage
                     ? 'Rhetorical Analysis & SOAPSTone Engine'
@@ -180,6 +195,22 @@ function App() {
             <div className="flex items-center gap-2.5 flex-wrap justify-center">
               {/* Segmented Subject Switcher */}
               <nav className="flex items-center gap-1 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200 dark:border-white/[0.08]">
+                {/* Home Command Tab (Red Style, in front of Vocab) */}
+                <button
+                  onClick={() => !isLoading && setSubject('home')}
+                  disabled={isLoading}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 ${
+                    isLoading ? 'opacity-40 cursor-not-allowed' : ''
+                  } ${
+                    isHome
+                      ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-white/50 dark:hover:bg-white/[0.05]'
+                  }`}
+                >
+                  <Flame className="h-3.5 w-3.5" />
+                  <span>Home</span>
+                </button>
+
                 <button
                   onClick={() => !isLoading && setSubject('vocab')}
                   disabled={isLoading}
@@ -296,6 +327,16 @@ function App() {
           )}
 
           <div className="mx-auto flex w-full max-w-5xl flex-col gap-10">
+            {/* ========================================================= */}
+            {/* SECTION 0: HOME DASHBOARD                                  */}
+            {/* ========================================================= */}
+            {isHome && (
+              <HomeDashboard
+                onNavigate={(s) => setSubject(s)}
+                onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
+              />
+            )}
+
             {/* ========================================================= */}
             {/* SECTION 1: VOCABULARY MODE                               */}
             {/* ========================================================= */}

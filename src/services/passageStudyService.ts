@@ -224,8 +224,8 @@ Produce JSON matching this exact structure:
 
 Ensure all fields are fully populated with scholarly AP Lang rigor. Do not return markdown outside the json block.`;
 
-  return await globalKeyPool.executeWithRotation(async (genAI) => {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
+  return await globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
+    const model = genAI.getGenerativeModel({ model: fallbackModel || 'gemini-2.5-flash' });
     const result = await model.generateContent(prompt);
     const text = result.response.text();
     const data = extractJson(text);

@@ -123,10 +123,10 @@ export class KeyPool {
   }
 
   /**
-   * Executes a Gemini API call with automatic key rotation on 429/ResourceExhausted or quota errors
+   * Executes a Gemini API call with automatic key rotation and model fallback on 429/ResourceExhausted or quota errors
    */
   public async executeWithRotation<T>(
-    operation: (genAI: GoogleGenerativeAI, activeKey: string) => Promise<T>,
+    operation: (genAI: GoogleGenerativeAI, activeKey: string, activeModelName: string) => Promise<T>,
     maxRetries?: number
   ): Promise<T> {
     this.refreshKeysFromStorage();
@@ -134,20 +134,25 @@ export class KeyPool {
       throw new Error('No API key found. Please connect your free Gemini API key to proceed.');
     }
 
-    const retries = maxRetries ?? Math.max(this.keys.length * 2, 3);
+    // Cascade models when a model daily free tier quota (e.g. 20 RPD on 3.8-flash) is depleted
+    const modelCandidates = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite'];
+    let modelIndex = 0;
+
+    const retries = maxRetries ?? Math.max(this.keys.length * modelCandidates.length * 2, 8);
     let attempts = 0;
     let lastError: any = null;
 
     while (attempts < retries) {
       const activeKey = this.getCurrentKey();
       const genAI = new GoogleGenerativeAI(activeKey);
+      const activeModelName = modelCandidates[modelIndex % modelCandidates.length];
 
       try {
-        return await operation(genAI, activeKey);
+        return await operation(genAI, activeKey, activeModelName);
       } catch (err: any) {
         lastError = err;
         const errMsg = String(err?.message || err);
-        const isRateLimitOrOverload =
+        const isQuotaOrRateLimit =
           errMsg.includes('429') ||
           errMsg.includes('503') ||
           errMsg.includes('RESOURCE_EXHAUSTED') ||
@@ -157,19 +162,41 @@ export class KeyPool {
           errMsg.includes('rate limit') ||
           errMsg.includes('403');
 
-        if (isRateLimitOrOverload && this.keys.length > 1) {
-          console.warn(`[KeyPool] Key ${this.currentIndex + 1} hit rate-limit or 503 high demand. Rotating to next pool key...`);
-          this.rotateKey();
+        // Check if a specific model free tier quota was exhausted (like 20 RPD limit on 3.8-flash)
+        const isModelQuotaExhausted =
+          errMsg.includes('Quota exceeded for metric') ||
+          errMsg.includes('GenerateRequestsPerDay') ||
+          errMsg.includes('free_tier_requests');
+
+        if (isModelQuotaExhausted) {
+          console.warn(`[KeyPool] Model ${activeModelName} daily quota exhausted. Falling back to alternative model...`);
+          modelIndex++;
           attempts++;
-          await new Promise((r) => setTimeout(r, 1200));
+          await new Promise((r) => setTimeout(r, 600));
           continue;
         }
 
-        if (isRateLimitOrOverload) {
-          // Single key rate limit or 503 high demand
+        if (isQuotaOrRateLimit && this.keys.length > 1) {
+          console.warn(`[KeyPool] Key ${this.currentIndex + 1} hit rate-limit or quota. Rotating to next key in pool...`);
+          this.rotateKey();
           attempts++;
-          console.warn(`[KeyPool] Temporary high demand (503) or rate limit. Retrying in ${1.5 * attempts}s (attempt ${attempts}/${retries})...`);
-          await new Promise((r) => setTimeout(r, 1500 * attempts));
+          await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
+
+        if (isQuotaOrRateLimit) {
+          // If single key hit rate limit, try falling back to next available model first
+          if (modelIndex < modelCandidates.length - 1) {
+            modelIndex++;
+            attempts++;
+            console.warn(`[KeyPool] Attempting fallback to ${modelCandidates[modelIndex]}...`);
+            await new Promise((r) => setTimeout(r, 800));
+            continue;
+          }
+
+          attempts++;
+          console.warn(`[KeyPool] Temporary rate limit. Retrying in ${1.2 * attempts}s (attempt ${attempts}/${retries})...`);
+          await new Promise((r) => setTimeout(r, 1200 * attempts));
           continue;
         }
 
@@ -180,7 +207,7 @@ export class KeyPool {
       }
     }
 
-    throw lastError || new Error('All API keys in the pool failed or exceeded their rate limits.');
+    throw lastError || new Error('All API keys and fallback models exceeded their rate limits or daily quota.');
   }
 }
 
