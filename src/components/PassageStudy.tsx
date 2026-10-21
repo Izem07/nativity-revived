@@ -181,7 +181,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-amber-950/40 via-slate-900 to-amber-950/30 border border-amber-500/30 shadow-2xl shadow-amber-500/5 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-6"
+        className="relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-amber-50 via-white to-amber-100/50 dark:from-amber-950/40 dark:via-slate-900 dark:to-amber-950/30 border border-amber-500/30 shadow-2xl shadow-amber-500/5 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-6"
       >
         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -189,10 +189,10 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/15 border border-amber-400/30 text-amber-300 text-xs font-bold tracking-wider uppercase mb-1">
             <Star className="h-3.5 w-3.5 fill-amber-300" /> Nativity AP Lang Rhetoric Suite
           </div>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-100 to-amber-400 font-serif tracking-tight">
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-700 via-amber-900 to-amber-800 dark:from-amber-200 dark:via-yellow-100 dark:to-amber-400 font-serif tracking-tight">
             Passage Rhetorical Study & Analysis
           </h2>
-          <p className="text-sm text-amber-200/80 max-w-2xl leading-relaxed">
+          <p className="text-sm text-zinc-600 dark:text-zinc-700 dark:text-amber-200/80 max-w-2xl leading-relaxed">
             Deconstruct iconic speeches and essays with automated <strong>SOAPSTone breakdowns</strong>, <strong>structural lines of reasoning</strong>, <strong>rhetorical device logs</strong>, and <strong>AP-style MCQs</strong>.
           </p>
         </div>
@@ -224,7 +224,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Preset Speeches Carousel */}
         <div className="lg:col-span-1 space-y-3">
-          <div className="flex items-center justify-between text-xs font-bold text-amber-300 px-1">
+          <div className="flex items-center justify-between text-xs font-bold text-amber-800 dark:text-amber-300 px-1">
             <span className="flex items-center gap-1.5 uppercase tracking-wider">
               <Scroll className="h-4 w-4 text-amber-400" /> Canonical AP Speeches
             </span>
@@ -235,7 +235,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
                 setCustomAuthor('');
                 setCustomText('');
               }}
-              className="text-[11px] font-semibold text-amber-400 hover:text-amber-200 underline"
+              className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-zinc-700 dark:text-amber-200 underline"
             >
               + Paste Custom Text
             </button>
@@ -252,18 +252,18 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
                   onClick={() => handleSelectPreset(preset)}
                   className={`p-4 rounded-2xl border cursor-pointer transition-all ${
                     isSelected
-                      ? 'bg-amber-950/40 border-amber-400/80 shadow-md shadow-amber-500/10 ring-1 ring-amber-400/50'
-                      : 'bg-slate-900/80 border-slate-800 hover:border-amber-500/40'
+                      ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-500 dark:border-amber-400/80 shadow-md shadow-amber-500/10 ring-1 ring-amber-400/50'
+                      : 'bg-white dark:bg-white dark:bg-slate-900/80 border-zinc-200 dark:border-slate-800 hover:border-amber-500/40'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-amber-200 font-serif">
+                    <span className="text-xs font-bold text-amber-800 dark:text-zinc-700 dark:text-amber-200 font-serif">
                       {preset.author}
                     </span>
-                    <span className="text-[10px] text-amber-400/70 font-mono">{preset.year}</span>
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400/70 font-mono">{preset.year}</span>
                   </div>
-                  <h4 className="text-sm font-semibold text-white truncate mb-1">{preset.title}</h4>
-                  <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                  <h4 className="text-sm font-semibold text-zinc-900 dark:text-white truncate mb-1">{preset.title}</h4>
+                  <p className="text-[11px] text-zinc-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
                     {preset.description}
                   </p>
                 </motion.div>
@@ -272,14 +272,14 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
           </div>
 
           {/* Linked Study Focus Banner */}
-          <div className="p-4 rounded-2xl bg-slate-900/90 border border-amber-500/20 space-y-2.5">
-            <div className="flex items-center justify-between text-xs font-bold text-amber-300">
+          <div className="p-4 rounded-2xl bg-white dark:bg-white dark:bg-slate-900/90 border border-amber-500/20 space-y-2.5 shadow-sm">
+            <div className="flex items-center justify-between text-xs font-bold text-amber-800 dark:text-amber-300">
               <span className="flex items-center gap-1.5">
                 <Compass className="h-3.5 w-3.5 text-amber-400" /> Linked Targets
               </span>
             </div>
 
-            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+            <label className="flex items-center gap-2 text-xs text-zinc-700 dark:text-slate-300 cursor-pointer">
               <input
                 type="checkbox"
                 checked={includeRhetoricalTerms}
@@ -291,7 +291,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
               </span>
             </label>
 
-            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+            <label className="flex items-center gap-2 text-xs text-zinc-700 dark:text-slate-300 cursor-pointer">
               <input
                 type="checkbox"
                 checked={includeVocabulary}
@@ -310,7 +310,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
           <div className="flex items-center justify-between text-xs text-slate-400 px-1">
             <div className="flex items-center gap-2">
               <Quote className="h-4 w-4 text-amber-400" />
-              <span className="font-bold text-white font-serif">
+              <span className="font-bold text-zinc-900 dark:text-zinc-900 dark:text-white font-serif">
                 {isCustomMode ? 'Custom AP Lang Excerpt' : customTitle || 'Selected Passage'}
               </span>
               {customAuthor && (
@@ -320,7 +320,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
             <span className="text-[11px] font-mono">{customText.length} characters</span>
           </div>
 
-          <div className="relative rounded-2xl border border-amber-500/25 bg-slate-950/70 p-4 shadow-inner">
+          <div className="relative rounded-2xl border border-zinc-300 dark:border-amber-500/25 bg-white dark:bg-slate-950/70 p-4 shadow-inner">
             <textarea
               value={customText}
               onChange={(e) => {
@@ -329,7 +329,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
               }}
               placeholder="Paste any AP Lang speech, persuasive essay, or historical letter here..."
               rows={11}
-              className="w-full bg-transparent text-sm sm:text-base text-slate-200 placeholder-slate-600 focus:outline-none resize-none font-serif leading-relaxed"
+              className="w-full bg-transparent text-sm sm:text-base text-zinc-900 dark:text-slate-200 placeholder-zinc-400 dark:placeholder-slate-600 focus:outline-none resize-none font-serif leading-relaxed"
             />
           </div>
         </div>
@@ -337,14 +337,14 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
 
       {/* Loading Indicator */}
       {isLoading && (
-        <div className="p-12 text-center rounded-3xl bg-slate-900/80 border border-amber-500/30 space-y-4 shadow-xl">
+        <div className="p-12 text-center rounded-3xl bg-white dark:bg-slate-900/80 border border-amber-500/30 space-y-4 shadow-xl">
           <div className="w-16 h-16 mx-auto rounded-3xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
             <Sparkles className="h-8 w-8 text-amber-400 animate-spin" />
           </div>
-          <h3 className="text-xl font-bold text-white font-serif">
+          <h3 className="text-xl font-bold text-zinc-900 dark:text-white font-serif">
             Conducting AP Lang Rhetorical Analysis...
           </h3>
-          <p className="text-xs text-amber-200/80 max-w-md mx-auto">
+          <p className="text-xs text-zinc-700 dark:text-amber-200/80 max-w-md mx-auto">
             Extracting SOAPSTone coordinates, tracing line of reasoning, pinpointing schemes & tropes, and designing AP-level multiple choice questions.
           </p>
         </div>
@@ -358,19 +358,19 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
           className="space-y-6 pt-4"
         >
           {/* Packet Top Bar & Tab Navigation */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/90 border border-amber-500/30 shadow-xl backdrop-blur">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-white dark:bg-slate-900/90 border border-amber-500/30 shadow-xl backdrop-blur">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-400/20 to-yellow-500/20 border border-amber-400/30">
                 <Scroll className="h-5 w-5 text-amber-300" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white font-serif">{studyPacket.title}</h3>
-                <p className="text-xs text-amber-300/80">Speaker: {studyPacket.author}</p>
+                <h3 className="text-lg font-bold text-zinc-900 dark:text-white font-serif">{studyPacket.title}</h3>
+                <p className="text-xs text-amber-700 dark:text-amber-300/80">Speaker: {studyPacket.author}</p>
               </div>
             </div>
 
             {/* View Tabs */}
-            <div className="flex items-center gap-1 bg-slate-950 p-1.5 rounded-xl border border-white/10 flex-wrap justify-center">
+            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-slate-950 p-1.5 rounded-xl border border-zinc-200 dark:border-white/10 flex-wrap justify-center">
               <button
                 onClick={() => setActiveTab('soapstone')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
@@ -444,7 +444,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
 
           {/* Historical Context Callout */}
           {studyPacket.historicalContext && (
-            <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-500/20 text-xs text-amber-200/90 leading-relaxed flex items-start gap-3">
+            <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-500/20 text-xs text-zinc-700 dark:text-amber-200/90 leading-relaxed flex items-start gap-3">
               <Clock className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
               <div>
                 <strong className="text-amber-300 block mb-0.5">Exigence & Historical Setting:</strong>
@@ -505,13 +505,13 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
 
               <div className="space-y-3">
                 {studyPacket.structuralMapping.map((sec, idx) => (
-                  <Card key={idx} className="p-5 bg-slate-900/90 border-amber-500/25 space-y-3">
+                  <Card key={idx} className="p-5 bg-white dark:bg-slate-900/90 border-amber-500/25 space-y-3">
                     <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2">
                       <div className="flex items-center gap-2">
                         <span className="w-6 h-6 rounded-full bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center">
                           {idx + 1}
                         </span>
-                        <h4 className="text-sm font-bold text-white font-serif">{sec.sectionTitle}</h4>
+                        <h4 className="text-sm font-bold text-zinc-900 dark:text-white font-serif">{sec.sectionTitle}</h4>
                       </div>
                       {sec.linesOrExcerpt && (
                         <span className="text-[11px] font-mono text-amber-400/80 italic">
@@ -527,11 +527,11 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
                         </span>
                         <p className="text-slate-200 leading-relaxed">{sec.summary}</p>
                       </div>
-                      <div className="space-y-1 bg-amber-950/20 p-3 rounded-xl border border-amber-500/20">
+                      <div className="space-y-1 bg-amber-50 dark:bg-amber-950/20 p-3 rounded-xl border border-amber-500/20">
                         <span className="font-semibold text-amber-300 uppercase tracking-wider text-[10px]">
                           Strategic Rhetorical Move:
                         </span>
-                        <p className="text-amber-100 leading-relaxed">{sec.rhetoricalMove}</p>
+                        <p className="text-zinc-800 dark:text-amber-100 leading-relaxed">{sec.rhetoricalMove}</p>
                       </div>
                     </div>
                   </Card>
@@ -562,7 +562,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {studyPacket.rhetoricalStrategies.map((strat, idx) => (
-                  <Card key={idx} className="p-5 bg-slate-900/90 border-amber-500/25 space-y-3 flex flex-col justify-between">
+                  <Card key={idx} className="p-5 bg-white dark:bg-slate-900/90 border-amber-500/25 space-y-3 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <Badge className="bg-gradient-to-r from-amber-400/20 to-yellow-400/20 text-amber-300 border border-amber-400/40 text-xs font-bold">
@@ -570,7 +570,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
                         </Badge>
                       </div>
 
-                      <blockquote className="p-3 rounded-xl bg-slate-950/80 border border-white/5 text-amber-100 font-serif italic text-xs sm:text-sm leading-relaxed mb-3">
+                      <blockquote className="p-3 rounded-xl bg-slate-950/80 border border-white/5 text-zinc-800 dark:text-amber-100 font-serif italic text-xs sm:text-sm leading-relaxed mb-3">
                         “{strat.quote}”
                       </blockquote>
 
@@ -585,7 +585,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
                     </div>
 
                     {strat.effectOnAudience && (
-                      <div className="p-2.5 rounded-xl bg-amber-950/30 border border-amber-500/20 text-[11px] text-amber-200/90">
+                      <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-500/20 text-[11px] text-zinc-700 dark:text-amber-200/90">
                         <strong className="text-amber-300 block mb-0.5">Audience Psychological Impact:</strong>
                         {strat.effectOnAudience}
                       </div>
@@ -613,7 +613,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
                   const isCorrect = selectedOpt === q.correct;
 
                   return (
-                    <Card key={qIdx} className="p-5 sm:p-6 bg-slate-900/90 border-amber-500/25 space-y-4">
+                    <Card key={qIdx} className="p-5 sm:p-6 bg-white dark:bg-slate-900/90 border-amber-500/25 space-y-4">
                       <div className="space-y-1">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
                           Question {qIdx + 1}
@@ -664,7 +664,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
                       </div>
 
                       {hasAnswered && (
-                        <div className="p-3.5 rounded-xl bg-amber-950/30 border border-amber-500/20 text-xs text-amber-200 leading-relaxed space-y-1">
+                        <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-500/20 text-xs text-zinc-700 dark:text-amber-200 leading-relaxed space-y-1">
                           <strong className="text-amber-300 block">AP Lang Question Rationale:</strong>
                           <p>{q.rationale}</p>
                         </div>
@@ -679,13 +679,13 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
           {/* Tab 5: FRQ 2 Defensible Thesis & Essay Outline */}
           {activeTab === 'essay' && (
             <div className="space-y-6">
-              <Card className="p-6 bg-slate-900/90 border-amber-500/30 space-y-4 shadow-xl">
+              <Card className="p-6 bg-white dark:bg-slate-900/90 border-amber-500/30 space-y-4 shadow-xl">
                 <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
                   <PenTool className="h-4 w-4 text-amber-400" />
                   AP Lang Question 2: Defensible Thesis Statement Template
                 </div>
 
-                <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-400/40 text-amber-100 font-serif text-sm sm:text-base leading-relaxed italic">
+                <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-400/40 text-zinc-800 dark:text-amber-100 font-serif text-sm sm:text-base leading-relaxed italic">
                   “{studyPacket.essayScaffold.defensibleThesis}”
                 </div>
 
@@ -701,7 +701,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
                 </span>
 
                 {studyPacket.essayScaffold.bodyParagraphIdeas.map((idea, idx) => (
-                  <Card key={idx} className="p-5 bg-slate-900/80 border-slate-800 space-y-2">
+                  <Card key={idx} className="p-5 bg-white dark:bg-slate-900/80 border-slate-800 space-y-2">
                     <div className="flex items-center justify-between">
                       <Badge className="bg-amber-400/20 text-amber-300 border-amber-400/30 text-xs">
                         Body Paragraph {idx + 1}: {idea.deviceOrChoice}
@@ -710,7 +710,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
 
                     <div className="text-xs sm:text-sm text-slate-200 space-y-1">
                       <span className="text-slate-400 text-[11px] font-semibold block">Model Topic Sentence:</span>
-                      <p className="font-serif italic text-amber-100">“{idea.topicSentence}”</p>
+                      <p className="font-serif italic text-zinc-800 dark:text-amber-100">“{idea.topicSentence}”</p>
                     </div>
 
                     <div className="text-xs text-slate-400 pt-1 border-t border-white/5">
@@ -740,7 +740,7 @@ function SoapstoneCard({
   content: string;
 }) {
   return (
-    <Card className="p-5 bg-slate-900/90 border-amber-500/25 space-y-3 shadow-lg hover:border-amber-400/50 transition-all flex flex-col justify-between">
+    <Card className="p-5 bg-white dark:bg-slate-900/90 border-amber-500/25 space-y-3 shadow-lg hover:border-amber-400/50 transition-all flex flex-col justify-between">
       <div>
         <div className="flex items-center justify-between mb-2">
           <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-md shadow-amber-500/20">
@@ -751,7 +751,7 @@ function SoapstoneCard({
           </span>
         </div>
 
-        <h4 className="text-base font-bold text-white font-serif">{title}</h4>
+        <h4 className="text-base font-bold text-zinc-900 dark:text-white font-serif">{title}</h4>
         <p className="text-[10px] text-amber-300/80 font-medium mb-3">{subtitle}</p>
 
         <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-sans">

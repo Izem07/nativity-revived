@@ -177,21 +177,21 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
       {/* ========================================================================= */}
       {/* RED HERO BANNER & CUSTOMIZATION BAR                                        */}
       {/* ========================================================================= */}
-      <div className="relative overflow-hidden rounded-[2.5rem] border border-rose-500/30 bg-gradient-to-br from-rose-950/40 via-zinc-950/90 to-zinc-950 p-6 sm:p-10 shadow-2xl">
+      <div className="relative overflow-hidden rounded-[2.5rem] border border-rose-500/30 bg-gradient-to-br from-rose-500/10 via-white to-rose-50/60 dark:from-rose-950/40 dark:via-zinc-950/90 dark:to-zinc-950 p-6 sm:p-10 shadow-xl dark:shadow-2xl transition-colors">
         {/* Atmospheric Ambient Red Flares */}
-        <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-rose-600/20 blur-[100px]" />
-        <div className="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-red-600/15 blur-[100px]" />
+        <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-rose-500/15 dark:bg-rose-600/20 blur-[100px]" />
+        <div className="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-red-400/10 dark:bg-red-600/15 blur-[100px]" />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-400 text-xs font-mono font-semibold tracking-wider uppercase">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-mono font-semibold tracking-wider uppercase">
               <Flame className="h-3.5 w-3.5 fill-rose-500 text-rose-500" />
               <span>AP Lang Academic Engine • Command Center</span>
             </div>
-            <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white">
-              Nativity <span className="text-rose-500 font-normal">Command</span>
+            <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-zinc-900 dark:text-white">
+              Nativity <span className="text-rose-600 dark:text-rose-500 font-normal">Command</span>
             </h1>
-            <p className="text-sm text-zinc-400 max-w-xl leading-relaxed">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-xl leading-relaxed">
               Customizable mastery headquarters for the official College Board AP English Language & Composition exam.
             </p>
           </div>
@@ -199,59 +199,59 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
           {/* Quick Stats / Official College Board Exam Schedule Pills & Live Countdown */}
           <div className="flex items-center gap-3 self-start md:self-center flex-wrap">
             {/* Live Exam Countdown Card */}
-            <div className="p-3.5 rounded-2xl border border-rose-500/40 bg-gradient-to-r from-rose-950/60 to-red-950/40 text-rose-300 flex items-center gap-3 shadow-lg shadow-rose-950/30">
-              <Timer className="h-5 w-5 text-rose-400 shrink-0 animate-pulse" />
+            <div className="p-3.5 rounded-2xl border border-rose-500/30 bg-rose-50 dark:bg-gradient-to-r dark:from-rose-950/60 dark:to-red-950/40 text-rose-700 dark:text-rose-300 flex items-center gap-3 shadow-md shadow-rose-500/5 dark:shadow-rose-950/30">
+              <Timer className="h-5 w-5 text-rose-600 dark:text-rose-400 shrink-0 animate-pulse" />
               <div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-rose-400/90 block font-semibold flex items-center gap-1.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-rose-600 dark:text-rose-400/90 block font-semibold flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping inline-block" />
                   Live Exam Countdown
                 </span>
-                <span className="font-mono text-xs sm:text-sm font-bold text-white tracking-tight">
+                <span className="font-mono text-xs sm:text-sm font-bold text-zinc-900 dark:text-white tracking-tight">
                   {countdown.isPassed ? (
                     'Exam Completed!'
                   ) : (
                     <>
-                      <span className="text-rose-400">{countdown.days}</span>d{' '}
-                      <span className="text-zinc-300">{countdown.hours}</span>h{' '}
-                      <span className="text-zinc-300">{countdown.minutes}</span>m{' '}
-                      <span className="text-zinc-400 text-[11px]">{countdown.seconds}s</span>
+                      <span className="text-rose-600 dark:text-rose-400">{countdown.days}</span>d{' '}
+                      <span className="text-zinc-700 dark:text-zinc-300">{countdown.hours}</span>h{' '}
+                      <span className="text-zinc-700 dark:text-zinc-300">{countdown.minutes}</span>m{' '}
+                      <span className="text-zinc-500 dark:text-zinc-400 text-[11px]">{countdown.seconds}s</span>
                     </>
                   )}
                 </span>
               </div>
             </div>
 
-            <div className="p-3.5 rounded-2xl border border-rose-500/20 bg-rose-950/30 text-rose-300 flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-rose-400 shrink-0" />
+            <div className="p-3.5 rounded-2xl border border-rose-500/20 bg-white/80 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 flex items-center gap-3 shadow-sm">
+              <Calendar className="h-5 w-5 text-rose-600 dark:text-rose-400 shrink-0" />
               <div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block font-semibold">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block font-semibold">
                   Exam Date & Time
                 </span>
-                <span className="font-mono text-xs sm:text-sm font-bold text-white">
+                <span className="font-mono text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">
                   Wed, May 12, 2027 • 8:00 AM (EST)
                 </span>
               </div>
             </div>
 
-            <div className="p-3.5 rounded-2xl border border-sky-500/20 bg-sky-950/30 text-sky-300 flex items-center gap-3">
-              <Laptop className="h-5 w-5 text-sky-400 shrink-0" />
+            <div className="p-3.5 rounded-2xl border border-sky-500/20 bg-sky-50/80 dark:bg-sky-950/30 text-sky-700 dark:text-sky-300 flex items-center gap-3 shadow-sm">
+              <Laptop className="h-5 w-5 text-sky-600 dark:text-sky-400 shrink-0" />
               <div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block font-semibold">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block font-semibold">
                   Session & Format
                 </span>
-                <span className="font-mono text-xs sm:text-sm font-bold text-white">
+                <span className="font-mono text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">
                   Session 1 • Bluebook App
                 </span>
               </div>
             </div>
 
-            <div className="p-3.5 rounded-2xl border border-white/[0.08] bg-zinc-900/60 text-zinc-300 flex items-center gap-3">
-              <Clock className="h-5 w-5 text-zinc-400 shrink-0" />
+            <div className="p-3.5 rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white/80 dark:bg-zinc-900/60 text-zinc-700 dark:text-zinc-300 flex items-center gap-3 shadow-sm">
+              <Clock className="h-5 w-5 text-zinc-500 dark:text-zinc-400 shrink-0" />
               <div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block font-semibold">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block font-semibold">
                   Total Duration
                 </span>
-                <span className="font-mono text-xs sm:text-sm font-bold text-white">3h 15m Total</span>
+                <span className="font-mono text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">3h 15m Total</span>
               </div>
             </div>
           </div>
@@ -264,7 +264,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             className={`px-4 py-2 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 flex items-center gap-2 ${
               activeTab === 'overview'
                 ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
-                : 'text-zinc-400 hover:text-white hover:bg-white/[0.05]'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.05]'
             }`}
           >
             <Compass className="h-3.5 w-3.5" />
@@ -276,7 +276,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             className={`px-4 py-2 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 flex items-center gap-2 ${
               activeTab === 'analogies'
                 ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
-                : 'text-zinc-400 hover:text-white hover:bg-white/[0.05]'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.05]'
             }`}
           >
             <Layers className="h-3.5 w-3.5" />
@@ -288,7 +288,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             className={`px-4 py-2 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 flex items-center gap-2 ${
               activeTab === 'passage'
                 ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
-                : 'text-zinc-400 hover:text-white hover:bg-white/[0.05]'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.05]'
             }`}
           >
             <FileText className="h-3.5 w-3.5" />
@@ -300,7 +300,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             className={`px-4 py-2 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 flex items-center gap-2 ${
               activeTab === 'rubrics'
                 ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
-                : 'text-zinc-400 hover:text-white hover:bg-white/[0.05]'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.05]'
             }`}
           >
             <PenTool className="h-3.5 w-3.5" />
