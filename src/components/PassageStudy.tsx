@@ -60,6 +60,8 @@ export function PassageStudy({
   const [isCustomMode, setIsCustomMode] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
+  // Track whether a 503 high‑demand error was seen so we can offer a manual retry button
+  const [highDemandError, setHighDemandError] = useState(false);
   const [studyPacket, setStudyPacket] = useState<APPassageStudyPacket | null>(null);
   const [activeTab, setActiveTab] = useState<PacketViewTab>('soapstone');
   const [copiedMarkdown, setCopiedMarkdown] = useState(false);
