@@ -93,6 +93,44 @@ async function fetchWiktionarySingle(term: string): Promise<WordDefinitionResult
   return null;
 }
 
+// Helper to look up via Datamuse API (fast, high TPM, zero auth required)
+async function fetchDatamuseSingle(term: string): Promise<WordDefinitionResult | null> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+  try {
+    const res = await fetch(`https://api.datamuse.com/words?sp=${encodeURIComponent(term)}&md=d&max=1`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0 && Array.isArray(data[0].defs) && data[0].defs.length > 0) {
+        const rawDef = String(data[0].defs[0] || '');
+        const tabIdx = rawDef.indexOf('\t');
+        let pos = '';
+        let defText = rawDef;
+        if (tabIdx !== -1) {
+          const rawPos = rawDef.slice(0, tabIdx).trim();
+          pos = rawPos === 'n' ? 'noun' : rawPos === 'v' ? 'verb' : rawPos === 'adj' ? 'adjective' : rawPos === 'adv' ? 'adverb' : rawPos;
+          defText = rawDef.slice(tabIdx + 1).trim();
+        }
+        if (defText) {
+          return {
+            word: data[0].word || term,
+            partOfSpeech: pos || 'definition',
+            definition: defText,
+            example: undefined
+          };
+        }
+      }
+    }
+  } catch {
+    clearTimeout(timeoutId);
+  }
+  return null;
+}
+
 export async function lookupWordDefinition(rawQuery: string): Promise<WordDefinitionResult> {
   // 1. Clean query string
   const cleaned = rawQuery.replace(/[^a-zA-Z\s-]/g, ' ').trim().toLowerCase();

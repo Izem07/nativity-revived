@@ -39,6 +39,8 @@ interface PassageStudyProps {
   activeRhetoricalTerms?: string[];
   activeVocabularyWords?: string[];
   onOpenApiKeyModal?: () => void;
+  /** Show beta badge when true. */
+  isBeta?: boolean;
 }
 
 type PacketViewTab = 'soapstone' | 'structure' | 'strategies' | 'mcq' | 'essay';
@@ -47,6 +49,7 @@ export function PassageStudy({
   activeRhetoricalTerms = [],
   activeVocabularyWords = [],
   onOpenApiKeyModal,
+  isBeta = true,
 }: PassageStudyProps) {
   const [selectedPresetId, setSelectedPresetId] = useState<string>('florence-kelley');
   const [customTitle, setCustomTitle] = useState('');
@@ -192,6 +195,11 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
           <h2 className="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-700 via-amber-900 to-amber-800 dark:from-amber-200 dark:via-yellow-100 dark:to-amber-400 font-serif tracking-tight">
             Passage Rhetorical Study & Analysis
           </h2>
+          {isBeta && (
+            <Badge className="ml-2 mt-1 bg-amber-100 text-amber-800 dark:bg-amber-700 dark:text-amber-200">
+              Beta
+            </Badge>
+          )}
           <p className="text-sm text-zinc-600 dark:text-amber-200/80 max-w-2xl leading-relaxed">
             Deconstruct iconic speeches and essays with automated <strong>SOAPSTone breakdowns</strong>, <strong>structural lines of reasoning</strong>, <strong>rhetorical device logs</strong>, and <strong>AP-style MCQs</strong>.
           </p>
