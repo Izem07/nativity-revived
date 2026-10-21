@@ -135,7 +135,7 @@ export class KeyPool {
     }
 
     // Cascade models when a model daily free tier quota (e.g. 20 RPD on 3.8-flash) is depleted
-    const modelCandidates = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
+    const modelCandidates = ['gemini-3.8-flash'];
     let modelIndex = 0;
 
     const retries = maxRetries ?? Math.max(this.keys.length * modelCandidates.length * 2, 8);
