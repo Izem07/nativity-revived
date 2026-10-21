@@ -157,13 +157,31 @@ export const generateQuizContent = async (vocabularyList: string[]): Promise<Qui
 export const testAPIKey = async (candidateKey?: string): Promise<{ valid: boolean; error?: string }> => {
   try {
     const key = candidateKey ? candidateKey.trim() : getStoredAPIKey();
-    if (!key) return { valid: false, error: 'No API key provided' };
+    if (!key) return { valid: false, error: "No API key provided" };
     const genAI = new GoogleGenerativeAI(key);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
-    const result = await model.generateContent('ping');
-    return { valid: Boolean(result.response.text()) };
+    const testModels = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-1.5-flash"];
+    let lastErr = "";
+    for (const modelName of testModels) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent("ping");
+        if (result?.response?.text()) {
+          return { valid: true };
+        }
+      } catch (e: any) {
+        lastErr = e?.message || String(e);
+        if (lastErr.includes("404") || lastErr.includes("not found") || lastErr.includes("no longer available")) {
+          continue;
+        }
+        if (lastErr.includes("429") || lastErr.includes("Quota exceeded") || lastErr.includes("RESOURCE_EXHAUSTED")) {
+          return { valid: true };
+        }
+        break;
+      }
+    }
+    return { valid: false, error: lastErr || "Invalid API Key" };
   } catch (err: any) {
-    return { valid: false, error: err?.message || 'Invalid API Key' };
+    return { valid: false, error: err?.message || "Invalid API Key" };
   }
 };
 

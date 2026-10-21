@@ -90,11 +90,7 @@ export function ApiKeyModal({ isOpen, onClose, onKeySaved }: ApiKeyModalProps) {
         onKeySaved?.(candidates[0]);
       } else {
         setVerifyStatus('error');
-        setErrorMessage(
-          testResult.error?.includes('API_KEY_INVALID') || testResult.error?.includes('400')
-            ? 'Invalid API Key. Please verify the key from Google AI Studio.'
-            : testResult.error || 'API Key verification failed. Please check your key.'
-        );
+        setErrorMessage(testResult.error || 'API Key verification failed. Please check your key.');
       }
     } catch (err: any) {
       setVerifyStatus('error');
