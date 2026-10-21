@@ -18,7 +18,9 @@ import {
   PenTool,
   Award,
   RefreshCw,
-  Database
+  Database,
+  Calendar,
+  Laptop
 } from 'lucide-react';
 
 export interface HomeDashboardProps {
@@ -159,24 +161,46 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             </p>
           </div>
 
-          {/* Quick Stats / Bluebook Status Pill */}
-          <div className="flex items-center gap-3 self-start md:self-center">
+          {/* Quick Stats / Official College Board Exam Schedule Pills */}
+          <div className="flex items-center gap-3 self-start md:self-center flex-wrap">
             <div className="p-3.5 rounded-2xl border border-rose-500/20 bg-rose-950/30 text-rose-300 flex items-center gap-3">
-              <Clock className="h-5 w-5 text-rose-400" />
+              <Calendar className="h-5 w-5 text-rose-400 shrink-0" />
               <div>
                 <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block font-semibold">
-                  Exam Timing
+                  Exam Date & Time
                 </span>
-                <span className="font-mono text-sm font-bold text-white">3h 15m Total</span>
+                <span className="font-mono text-xs sm:text-sm font-bold text-white">
+                  Wed, May 12, 2027 • 8:00 AM (EST)
+                </span>
+              </div>
+            </div>
+            <div className="p-3.5 rounded-2xl border border-sky-500/20 bg-sky-950/30 text-sky-300 flex items-center gap-3">
+              <Laptop className="h-5 w-5 text-sky-400 shrink-0" />
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block font-semibold">
+                  Session & Format
+                </span>
+                <span className="font-mono text-xs sm:text-sm font-bold text-white">
+                  Session 1 • Bluebook App
+                </span>
+              </div>
+            </div>
+            <div className="p-3.5 rounded-2xl border border-rose-500/20 bg-rose-950/30 text-rose-300 flex items-center gap-3">
+              <Clock className="h-5 w-5 text-rose-400 shrink-0" />
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block font-semibold">
+                  Total Duration
+                </span>
+                <span className="font-mono text-xs sm:text-sm font-bold text-white">3h 15m Total</span>
               </div>
             </div>
             <div className="p-3.5 rounded-2xl border border-white/[0.08] bg-zinc-900/60 text-zinc-300 flex items-center gap-3">
-              <Award className="h-5 w-5 text-amber-400" />
+              <Award className="h-5 w-5 text-amber-400 shrink-0" />
               <div>
                 <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block font-semibold">
                   Official Score
                 </span>
-                <span className="font-mono text-sm font-bold text-white">1–5 Scale</span>
+                <span className="font-mono text-xs sm:text-sm font-bold text-white">1–5 Scale</span>
               </div>
             </div>
           </div>
@@ -253,7 +277,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                 Multiple Choice (MCQ)
               </h3>
               <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed mb-6">
-                45 questions total with 4 answer choices (A, B, C, D) formatted digitally in the SAT Bluebook style.
+                45 questions total with 4 answer choices (A, B, C, D) delivered digitally via the Bluebook app (administered in Session 1, 8:00 AM local time).
               </p>
 
               <div className="space-y-3 font-mono text-xs">
