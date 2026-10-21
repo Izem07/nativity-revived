@@ -292,7 +292,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             }`}
           >
             <FileText className="h-3.5 w-3.5" />
-            <span>Passage Study & SOAPSTone</span>
+            <span>Passage Study</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold">Beta</span>
           </button>
 
           <button
@@ -532,9 +533,14 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                 <div className="h-10 w-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 flex items-center justify-center mb-4">
                   <Scroll className="h-5 w-5" />
                 </div>
-                <h4 className="font-serif text-lg font-bold text-zinc-900 dark:text-white mb-2">
-                  Passage Study & SOAPSTone
-                </h4>
+                <div className="flex items-center gap-2 mb-2">
+                  <h4 className="font-serif text-lg font-bold text-zinc-900 dark:text-white">
+                    Passage Study & SOAPSTone
+                  </h4>
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                    Beta
+                  </span>
+                </div>
                 <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
                   Generates rigorous AP MCQs, line-of-reasoning breakdowns, and rhetorical strategy trackers for canonical texts.
                 </p>

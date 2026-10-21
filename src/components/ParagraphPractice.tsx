@@ -196,7 +196,7 @@ export function ParagraphPractice({ paragraphData: initialParagraphData, vocabul
                 disabled={isGenerating}
                 className="w-full"
               >
-                {isGenerating ? 'Generating...' : 'Generate New Paragraph'}
+                {isGenerating ? 'Synthesizing...' : 'Generate New Paragraph'}
               </Button>
             </div>
           </Collapse>

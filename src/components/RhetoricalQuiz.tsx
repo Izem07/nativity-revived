@@ -244,7 +244,7 @@ export function RhetoricalQuiz({ questions: initialQuestions, rhetoricalTerms = 
               variant="outline"
               className="w-full border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-300 text-xs font-semibold"
             >
-              {isGenerating ? 'Generating 5 Questions...' : 'Generate 5 More Questions'}
+              {isGenerating ? 'Synthesizing 5 Questions...' : 'Generate 5 More Questions'}
             </Button>
           </div>
         </Collapse>

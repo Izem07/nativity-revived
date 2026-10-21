@@ -269,6 +269,9 @@ function App() {
                 >
                   <Scroll className="h-3.5 w-3.5" />
                   <span>Passage Study</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-900 dark:text-amber-200 border border-amber-400/30 uppercase font-bold text-[9px]">
+                    Beta
+                  </span>
                 </button>
               </nav>
 

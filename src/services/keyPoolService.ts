@@ -134,8 +134,15 @@ export class KeyPool {
       throw new Error('No API key found. Please connect your free Gemini API key to proceed.');
     }
 
-    // Cascade models when a model daily free tier quota (e.g. 20 RPD on 3.8-flash) is depleted
-    const modelCandidates = ['gemini-3.8-flash'];
+    // Cascade models using available free models:
+    // gemini-3.8-flash & gemini-3.6-flash (flagship flash models)
+    // gemini-3.5-flash-lite & gemini-3.1-flash-lite (high throughput, light token spending)
+    const modelCandidates = [
+      'gemini-3.8-flash',
+      'gemini-3.6-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.1-flash-lite'
+    ];
     let modelIndex = 0;
 
     const retries = maxRetries ?? Math.max(this.keys.length * modelCandidates.length * 2, 8);
@@ -152,13 +159,17 @@ export class KeyPool {
       } catch (err: any) {
         lastError = err;
         const errMsg = String(err?.message || err);
-        const isQuotaOrRateLimit =
-          errMsg.includes('429') ||
+        const isDemandOrServiceUnavailable =
           errMsg.includes('503') ||
-          errMsg.includes('RESOURCE_EXHAUSTED') ||
-          errMsg.includes('Quota exceeded') ||
           errMsg.includes('high demand') ||
           errMsg.includes('temporarily unavailable') ||
+          errMsg.includes('overloaded');
+
+        const isQuotaOrRateLimit =
+          errMsg.includes('429') ||
+          isDemandOrServiceUnavailable ||
+          errMsg.includes('RESOURCE_EXHAUSTED') ||
+          errMsg.includes('Quota exceeded') ||
           errMsg.includes('rate limit') ||
           errMsg.includes('403');
 
@@ -168,11 +179,13 @@ export class KeyPool {
           errMsg.includes('GenerateRequestsPerDay') ||
           errMsg.includes('free_tier_requests');
 
-        if (isModelQuotaExhausted) {
-          console.warn(`[KeyPool] Model ${activeModelName} daily quota exhausted. Falling back to alternative model...`);
+        // If the current model is overloaded (503 / high demand) or exhausted its daily quota,
+        // instantly switch to the next fallback model candidate (e.g. gemini-2.5-flash)
+        if (isDemandOrServiceUnavailable || isModelQuotaExhausted) {
+          console.warn(`[KeyPool] Model ${activeModelName} returned ${isDemandOrServiceUnavailable ? '503 High Demand' : 'Daily Quota Exhaustion'}. Switching to alternate model in cascade...`);
           modelIndex++;
           attempts++;
-          await new Promise((r) => setTimeout(r, 600));
+          await new Promise((r) => setTimeout(r, 400));
           continue;
         }
 
@@ -190,7 +203,7 @@ export class KeyPool {
             modelIndex++;
             attempts++;
             console.warn(`[KeyPool] Attempting fallback to ${modelCandidates[modelIndex]}...`);
-            await new Promise((r) => setTimeout(r, 800));
+            await new Promise((r) => setTimeout(r, 600));
             continue;
           }
 

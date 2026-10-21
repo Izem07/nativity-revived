@@ -215,7 +215,7 @@ export function Quiz({ questions: initialQuestions, vocabularyWords }: QuizProps
                 disabled={isGenerating}
                 className="w-full"
               >
-                {isGenerating ? 'Generating...' : 'Generate 5 More Questions'}
+                {isGenerating ? 'Synthesizing...' : 'Generate 5 More Questions'}
               </Button>
             </div>
           </Collapse>

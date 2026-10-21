@@ -165,13 +165,6 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
       setError('Please provide at least 3 vocabulary words.');
       return;
     }
-    // Check if this exact list already has cached data to save API credits
-    const cached = getCachedResult(normalized);
-    if (cached) {
-      onGenerate(cached.data, normalized);
-      onLoadingChange(false);
-      return;
-    }
     setPendingWords(normalized);
     setConfirmGenerateOpen(true);
   };

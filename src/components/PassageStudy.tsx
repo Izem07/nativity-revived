@@ -20,7 +20,9 @@ import {
   BookMarked,
   CheckCircle2,
   XCircle,
-  FileDown
+  FileDown,
+  Database,
+  FlaskConical
 } from 'lucide-react';
 import {
   APPassageStudyPacket,
@@ -75,6 +77,24 @@ export function PassageStudy({
     setIsCustomMode(false);
   };
 
+  const handleLoadCached = () => {
+    const textToAnalyze = customText.trim();
+    if (!textToAnalyze || textToAnalyze.length < 50) {
+      alert('Please provide or select a passage first.');
+      return;
+    }
+    const title = customTitle || (isCustomMode ? 'Custom Excerpt' : PRELOADED_AP_PASSAGES.find(p => p.id === selectedPresetId)?.title || 'AP Lang Excerpt');
+    const hash = computePassageHash(textToAnalyze, title);
+    const cached = getCachedPassageStudy(hash);
+    if (cached) {
+      setStudyPacket(cached);
+      setUserMcqSelections({});
+      setActiveTab('soapstone');
+    } else {
+      alert('No cached study packet found for this passage yet. Click "Generate Study Packet" to analyze it.');
+    }
+  };
+
   const handleGeneratePacket = async () => {
     const textToAnalyze = customText.trim();
     if (!textToAnalyze || textToAnalyze.length < 50) {
@@ -84,14 +104,7 @@ export function PassageStudy({
 
     const title = customTitle || (isCustomMode ? 'Custom Excerpt' : PRELOADED_AP_PASSAGES.find(p => p.id === selectedPresetId)?.title || 'AP Lang Excerpt');
     const author = customAuthor || (isCustomMode ? 'Unknown Speaker' : PRELOADED_AP_PASSAGES.find(p => p.id === selectedPresetId)?.author || 'Author');
-
     const hash = computePassageHash(textToAnalyze, title);
-    const cached = getCachedPassageStudy(hash);
-    if (cached) {
-      setStudyPacket(cached);
-      setUserMcqSelections({});
-      return;
-    }
 
     setIsLoading(true);
     try {
@@ -189,24 +202,45 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="space-y-2 relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/15 border border-amber-400/30 text-amber-300 text-xs font-bold tracking-wider uppercase mb-1">
-            <Star className="h-3.5 w-3.5 fill-amber-300" /> Nativity AP Lang Rhetoric Suite
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/15 border border-amber-400/30 text-amber-300 text-xs font-bold tracking-wider uppercase">
+              <Star className="h-3.5 w-3.5 fill-amber-300" /> Nativity AP Lang Rhetoric Suite
+            </div>
+            {isBeta && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-800 dark:text-amber-200 text-xs font-mono font-bold tracking-wider uppercase">
+                <FlaskConical className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                Beta • Under Active Testing
+              </span>
+            )}
           </div>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-700 via-amber-900 to-amber-800 dark:from-amber-200 dark:via-yellow-100 dark:to-amber-400 font-serif tracking-tight">
             Passage Rhetorical Study & Analysis
           </h2>
           {isBeta && (
-            <Badge className="ml-2 mt-1 bg-amber-100 text-amber-800 dark:bg-amber-700 dark:text-amber-200">
-              Beta
-            </Badge>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs font-medium">
+              <FlaskConical className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>
+                <strong>Beta Feature:</strong> This AI passage deconstruction engine is currently in beta testing. Please review generated SOAPSTone analysis and MCQs for accuracy.
+              </span>
+            </div>
           )}
           <p className="text-sm text-zinc-600 dark:text-amber-200/80 max-w-2xl leading-relaxed">
             Deconstruct iconic speeches and essays with automated <strong>SOAPSTone breakdowns</strong>, <strong>structural lines of reasoning</strong>, <strong>rhetorical device logs</strong>, and <strong>AP-style MCQs</strong>.
           </p>
         </div>
 
-        {/* Action Button */}
-        <div className="flex-shrink-0 relative z-10">
+        {/* Action Buttons */}
+        <div className="flex-shrink-0 relative z-10 flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+          <button
+            onClick={handleLoadCached}
+            disabled={isLoading}
+            className="flex items-center gap-2 px-4 py-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 dark:text-amber-200 font-semibold text-xs tracking-wide transition-all duration-200 disabled:opacity-40 shadow-sm"
+            title="Load cached analysis for this passage without making new AI calls"
+          >
+            <Database className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <span>Load Cached</span>
+          </button>
+
           <Button
             onClick={handleGeneratePacket}
             disabled={isLoading}
@@ -216,7 +250,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
             {isLoading ? (
               <span className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 animate-spin text-slate-950" />
-                Analyzing Rigorously...
+                Synthesizing Study Packet...
               </span>
             ) : (
               <span className="flex items-center gap-2">
@@ -350,7 +384,7 @@ ${studyPacket.essayScaffold.bodyParagraphIdeas
             <Sparkles className="h-8 w-8 text-amber-400 animate-spin" />
           </div>
           <h3 className="text-xl font-bold text-zinc-900 dark:text-white font-serif">
-            Conducting AP Lang Rhetorical Analysis...
+            Synthesizing AP Lang Rhetorical Analysis...
           </h3>
           <p className="text-xs text-zinc-700 dark:text-amber-200/80 max-w-md mx-auto">
             Extracting SOAPSTone coordinates, tracing line of reasoning, pinpointing schemes & tropes, and designing AP-level multiple choice questions.

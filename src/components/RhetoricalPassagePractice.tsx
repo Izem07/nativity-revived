@@ -201,7 +201,7 @@ export function RhetoricalPassagePractice({ passageData: initialData, rhetorical
               variant="outline"
               className="w-full border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-300 text-xs font-semibold"
             >
-              {isGenerating ? 'Generating Passage...' : 'Generate New Rhetorical Passage'}
+              {isGenerating ? 'Synthesizing Passage...' : 'Generate New Rhetorical Passage'}
             </Button>
           </div>
         </Collapse>

@@ -111,13 +111,6 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
       setError('Please provide at least 2 rhetorical devices.');
       return;
     }
-    // Check if this exact set already has cached data to save API credits
-    const cached = getCachedRhetoricalResult(normalized);
-    if (cached) {
-      onGenerate(cached.data, normalized);
-      onLoadingChange(false);
-      return;
-    }
     setPendingTerms(normalized);
     setConfirmGenerateOpen(true);
   };

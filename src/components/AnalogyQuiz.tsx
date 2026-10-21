@@ -374,7 +374,7 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
             {isLoading ? (
               <>
                 <RefreshCw className="h-4 w-4 animate-spin" />
-                <span>Loading {selectedIntensity} Set...</span>
+                <span>Synthesizing {selectedIntensity} Set...</span>
               </>
             ) : (
               <>
@@ -447,7 +447,7 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
             className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-xs font-semibold tracking-wide shadow-md shadow-violet-500/25 hover:shadow-violet-500/40 transition-all disabled:opacity-50"
           >
             {isLoading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-            Generate New
+            {isLoading ? 'Synthesizing...' : 'Generate New'}
           </button>
         </div>
       </div>
