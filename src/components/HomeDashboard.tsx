@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Flame,
@@ -20,7 +20,8 @@ import {
   RefreshCw,
   Database,
   Calendar,
-  Laptop
+  Laptop,
+  Timer
 } from 'lucide-react';
 
 export interface HomeDashboardProps {
@@ -122,6 +123,40 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   const [selectedUnit, setSelectedUnit] = useState<number>(1);
   const [unitFilter, setUnitFilter] = useState<'All' | 'Reading' | 'Writing'>('All');
 
+  // Live AP Exam Countdown Timer (Wednesday, May 12, 2027 at 08:00 AM EDT)
+  const [countdown, setCountdown] = useState<{
+    days: number;
+    hours: number;
+    minutes: number;
+    seconds: number;
+    isPassed: boolean;
+  }>(() => calculateTimeLeft());
+
+  function calculateTimeLeft() {
+    // Official target: May 12, 2027 08:00:00 EDT (UTC-4)
+    const targetDate = new Date('2027-05-12T08:00:00-04:00').getTime();
+    const now = Date.now();
+    const diff = targetDate - now;
+
+    if (diff <= 0) {
+      return { days: 0, hours: 0, minutes: 0, seconds: 0, isPassed: true };
+    }
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+    return { days, hours, minutes, seconds, isPassed: false };
+  }
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown(calculateTimeLeft());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Interactive FRQ Rubric Self-Checker State
   const [rubricEssay, setRubricEssay] = useState<'synthesis' | 'rhetorical' | 'argument'>('rhetorical');
   const [rubricThesis, setRubricThesis] = useState<number>(1);
@@ -161,8 +196,31 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             </p>
           </div>
 
-          {/* Quick Stats / Official College Board Exam Schedule Pills */}
+          {/* Quick Stats / Official College Board Exam Schedule Pills & Live Countdown */}
           <div className="flex items-center gap-3 self-start md:self-center flex-wrap">
+            {/* Live Exam Countdown Card */}
+            <div className="p-3.5 rounded-2xl border border-rose-500/40 bg-gradient-to-r from-rose-950/60 to-red-950/40 text-rose-300 flex items-center gap-3 shadow-lg shadow-rose-950/30">
+              <Timer className="h-5 w-5 text-rose-400 shrink-0 animate-pulse" />
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-rose-400/90 block font-semibold flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping inline-block" />
+                  Live Exam Countdown
+                </span>
+                <span className="font-mono text-xs sm:text-sm font-bold text-white tracking-tight">
+                  {countdown.isPassed ? (
+                    'Exam Completed!'
+                  ) : (
+                    <>
+                      <span className="text-rose-400">{countdown.days}</span>d{' '}
+                      <span className="text-zinc-300">{countdown.hours}</span>h{' '}
+                      <span className="text-zinc-300">{countdown.minutes}</span>m{' '}
+                      <span className="text-zinc-400 text-[11px]">{countdown.seconds}s</span>
+                    </>
+                  )}
+                </span>
+              </div>
+            </div>
+
             <div className="p-3.5 rounded-2xl border border-rose-500/20 bg-rose-950/30 text-rose-300 flex items-center gap-3">
               <Calendar className="h-5 w-5 text-rose-400 shrink-0" />
               <div>
@@ -174,6 +232,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                 </span>
               </div>
             </div>
+
             <div className="p-3.5 rounded-2xl border border-sky-500/20 bg-sky-950/30 text-sky-300 flex items-center gap-3">
               <Laptop className="h-5 w-5 text-sky-400 shrink-0" />
               <div>
@@ -185,22 +244,14 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                 </span>
               </div>
             </div>
-            <div className="p-3.5 rounded-2xl border border-rose-500/20 bg-rose-950/30 text-rose-300 flex items-center gap-3">
-              <Clock className="h-5 w-5 text-rose-400 shrink-0" />
+
+            <div className="p-3.5 rounded-2xl border border-white/[0.08] bg-zinc-900/60 text-zinc-300 flex items-center gap-3">
+              <Clock className="h-5 w-5 text-zinc-400 shrink-0" />
               <div>
                 <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block font-semibold">
                   Total Duration
                 </span>
                 <span className="font-mono text-xs sm:text-sm font-bold text-white">3h 15m Total</span>
-              </div>
-            </div>
-            <div className="p-3.5 rounded-2xl border border-white/[0.08] bg-zinc-900/60 text-zinc-300 flex items-center gap-3">
-              <Award className="h-5 w-5 text-amber-400 shrink-0" />
-              <div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block font-semibold">
-                  Official Score
-                </span>
-                <span className="font-mono text-xs sm:text-sm font-bold text-white">1–5 Scale</span>
               </div>
             </div>
           </div>
