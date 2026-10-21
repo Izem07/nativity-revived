@@ -24,6 +24,29 @@ interface VocabInputProps {
 
 const PRE_FILLED_LISTS = [
   {
+    label: 'Unit 3 Vocab (18 Words)',
+    words: [
+      'Apathy',
+      'Disdain',
+      'Diverse',
+      'Enigma',
+      'Futile',
+      'Gratuitous',
+      'Hackneyed',
+      'Incessant',
+      'Insidious',
+      'Integrity',
+      'Jocular',
+      'Kindle',
+      'Ludicrous',
+      'Provocative',
+      'Recluse',
+      'Reverence',
+      'Scrutinize',
+      'Superficial',
+    ],
+  },
+  {
     label: 'Vocab List 2 (18 Words)',
     words: [
       'Candid',
