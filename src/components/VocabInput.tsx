@@ -24,29 +24,6 @@ interface VocabInputProps {
 
 const PRE_FILLED_LISTS = [
   {
-    label: 'Unit 3 Vocab (18 Words)',
-    words: [
-      'Apathy',
-      'Disdain',
-      'Diverse',
-      'Enigma',
-      'Futile',
-      'Gratuitous',
-      'Hackneyed',
-      'Incessant',
-      'Insidious',
-      'Integrity',
-      'Jocular',
-      'Kindle',
-      'Ludicrous',
-      'Provocative',
-      'Recluse',
-      'Reverence',
-      'Scrutinize',
-      'Superficial',
-    ],
-  },
-  {
     label: 'Vocab List 2 (18 Words)',
     words: [
       'Candid',
@@ -69,6 +46,29 @@ const PRE_FILLED_LISTS = [
       'Virulent',
     ],
   },
+  {
+    label: 'Vocab List 3 (18 Words)',
+    words: [
+      'Apathy',
+      'Disdain',
+      'Diverse',
+      'Enigma',
+      'Futile',
+      'Gratuitous',
+      'Hackneyed',
+      'Incessant',
+      'Insidious',
+      'Integrity',
+      'Jocular',
+      'Kindle',
+      'Ludicrous',
+      'Provocative',
+      'Recluse',
+      'Reverence',
+      'Scrutinize',
+      'Superficial',
+    ],
+  },
 ] as const;
 
 export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: VocabInputProps) {
@@ -81,6 +81,8 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
 
   const [inputMode, setInputMode] = useState<'list' | 'paragraph'>('list');
   const [paragraphText, setParagraphText] = useState('');
+
+  const [selectedPresetLabel, setSelectedPresetLabel] = useState<string>('Custom (Empty)');
 
   const filledCount = useMemo(() => vocabList.filter((word) => word.trim() !== '').length, [vocabList]);
 
@@ -131,8 +133,16 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
     }
   };
 
-  const handleApplyPreFilledList = (words: readonly string[]) => {
+  const handleApplyPreFilledList = (label: string, words: readonly string[]) => {
+    setSelectedPresetLabel(label);
     setVocabList([...words]);
+    setError(null);
+  };
+
+  const handleClearToEmpty = () => {
+    setSelectedPresetLabel('Custom (Empty)');
+    setVocabList(['']);
+    setParagraphText('');
     setError(null);
   };
 
@@ -281,15 +291,35 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
                 Course Presets
               </span>
               <div className="flex flex-wrap gap-2">
-                {PRE_FILLED_LISTS.map((preset) => (
-                  <button
-                    key={preset.label}
-                    onClick={() => handleApplyPreFilledList(preset.words)}
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-medium border border-brand-500/30 bg-brand-500/10 text-brand-700 dark:text-brand-300 hover:bg-brand-500/20 transition-all"
-                  >
-                    {preset.label}
-                  </button>
-                ))}
+                {/* Empty / Clear Placeholder Preset (Default State) */}
+                <button
+                  onClick={handleClearToEmpty}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-medium border transition-all flex items-center gap-1.5 ${
+                    selectedPresetLabel === 'Custom (Empty)'
+                      ? 'border-brand-500 bg-brand-500/20 text-brand-700 dark:text-brand-300 shadow-sm font-semibold'
+                      : 'border-zinc-200 dark:border-white/[0.08] bg-zinc-100 dark:bg-white/[0.03] text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-white/20'
+                  }`}
+                >
+                  <X className="h-3 w-3" />
+                  <span>Clear (Empty)</span>
+                </button>
+
+                {PRE_FILLED_LISTS.map((preset) => {
+                  const isSelected = selectedPresetLabel === preset.label;
+                  return (
+                    <button
+                      key={preset.label}
+                      onClick={() => handleApplyPreFilledList(preset.label, preset.words)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                        isSelected
+                          ? 'border-brand-500 bg-brand-500/20 text-brand-700 dark:text-brand-300 shadow-sm font-semibold'
+                          : 'border-brand-500/30 bg-brand-500/10 text-brand-700 dark:text-brand-300 hover:bg-brand-500/20'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

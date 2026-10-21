@@ -25,8 +25,8 @@ interface RhetoricalInputProps {
 }
 
 export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: RhetoricalInputProps) {
-  const [selectedUnitId, setSelectedUnitId] = useState<string>(RHETORICAL_COURSE_UNITS[0].id);
-  const [termsList, setTermsList] = useState<string[]>([...RHETORICAL_COURSE_UNITS[0].terms]);
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
+  const [termsList, setTermsList] = useState<string[]>(['']);
   const [showCourseNotes, setShowCourseNotes] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +48,14 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
   const handleSelectUnit = (unit: RhetoricalCourseUnit) => {
     setSelectedUnitId(unit.id);
     setTermsList([...unit.terms]);
+    setError(null);
+  };
+
+  const handleClearToEmpty = () => {
+    setSelectedUnitId(null);
+    setTermsList(['']);
+    setParagraphText('');
+    setShowCourseNotes(false);
     setError(null);
   };
 
@@ -186,6 +194,24 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            {/* Empty / Clear Placeholder Card (Default Selection) */}
+            <button
+              onClick={handleClearToEmpty}
+              className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                selectedUnitId === null
+                  ? 'border-emerald-500 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200 shadow-sm'
+                  : 'border-zinc-200 dark:border-white/[0.06] bg-zinc-50 dark:bg-white/[0.02] text-zinc-700 dark:text-zinc-300 hover:border-emerald-500/40'
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <X className="h-3.5 w-3.5 text-zinc-400" />
+                <span className="text-xs font-semibold">Custom (Empty)</span>
+              </div>
+              <div className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate mt-1">
+                Clear devices
+              </div>
+            </button>
+
             {RHETORICAL_COURSE_UNITS.map((unit) => {
               const isSelected = unit.id === selectedUnitId;
               return (
