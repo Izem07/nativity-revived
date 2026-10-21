@@ -33,15 +33,15 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_GEMINI_API_KEY: ${{secrets.VITE_GEMINI_API_KEY}}
-          VITE_GEMINI_API_KEY_1: ${{secrets.VITE_GEMINI_API_KEY_1}}
-          VITE_GEMINI_API_KEY_2: ${{secrets.VITE_GEMINI_API_KEY_2}}
-          VITE_GEMINI_API_KEY_3: ${{secrets.VITE_GEMINI_API_KEY_3}}
-          VITE_GEMINI_API_KEY_4: ${{secrets.VITE_GEMINI_API_KEY_4}}
-          VITE_GEMINI_API_KEY_5: ${{secrets.VITE_GEMINI_API_KEY_5}}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          VITE_GEMINI_API_KEY_1: ${{ secrets.VITE_GEMINI_API_KEY_1 }}
+          VITE_GEMINI_API_KEY_2: ${{ secrets.VITE_GEMINI_API_KEY_2 }}
+          VITE_GEMINI_API_KEY_3: ${{ secrets.VITE_GEMINI_API_KEY_3 }}
+          VITE_GEMINI_API_KEY_4: ${{ secrets.VITE_GEMINI_API_KEY_4 }}
+          VITE_GEMINI_API_KEY_5: ${{ secrets.VITE_GEMINI_API_KEY_5 }}
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
-          github_token: ${{secrets.GITHUB_TOKEN}}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
