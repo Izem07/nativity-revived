@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState } from 'react';
 import {
   BookOpen,
   Brain,
@@ -7,7 +6,6 @@ import {
   Grid3X3,
   Feather,
   Target,
-  Sparkles,
   RotateCcw,
   BookMarked,
   KeyRound,
@@ -23,7 +21,8 @@ import Quiz from './components/Quiz';
 import { GameArea } from './components/GameArea';
 import ParagraphPractice from './components/ParagraphPractice';
 import { Tabs, TabsList, TabsTrigger } from './components/ui/Tabs';
-import { QuizGenerationResult, RhetoricalGenerationResult, getStoredAPIKey } from './services/geminiService';
+import { QuizGenerationResult, RhetoricalGenerationResult } from './services/geminiService';
+import { useHasApiKey } from './hooks/useHasApiKey';
 import { VocabInput } from './components/VocabInput';
 import { RhetoricalInput } from './components/RhetoricalInput';
 import { RhetoricalFlashcards } from './components/RhetoricalFlashcards';
@@ -35,6 +34,8 @@ import { AnalogyQuiz } from './components/AnalogyQuiz';
 import { HomeDashboard } from './components/HomeDashboard';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { GenerationProgress } from './components/GenerationProgress';
+import { cancelGeneration } from './services/generationControl';
 import { useTheme } from './theme/ThemeProvider';
 
 type StudySubject = 'home' | 'vocab' | 'analogy' | 'rhetoric' | 'passage';
@@ -48,7 +49,7 @@ function App() {
 
   // API Key State
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
-  const [apiKeyConfigured, setApiKeyConfigured] = useState(() => Boolean(getStoredAPIKey()));
+  const apiKeyConfigured = useHasApiKey();
 
   // Vocab State
   const [vocabMode, setVocabMode] = useState<VocabLearningMode>('input');
@@ -61,14 +62,9 @@ function App() {
   const [rhetoricalTermsList, setRhetoricalTermsList] = useState<string[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    const handleStorageChange = () => {
-      setApiKeyConfigured(Boolean(getStoredAPIKey()));
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+  // Analogies and Passage Study show their own progress screens but still lock navigation
+  const [isSectionGenerating, setIsSectionGenerating] = useState(false);
+  const navLocked = isLoading || isSectionGenerating;
 
   const hasVocabContent = Boolean(vocabData);
   const hasRhetoricalContent = Boolean(rhetoricalData);
@@ -179,11 +175,11 @@ function App() {
                 </div>
                 <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
                   {isHome
-                    ? 'Command Center & Exam Blueprint'
+                    ? 'AP Lang Study Hub'
                     : isAnalogy
                     ? 'AP Lang Analogy Review'
                     : isPassage
-                    ? 'Rhetorical Analysis & SOAPSTone Engine'
+                    ? 'Passage Practice Test'
                     : isRhetoric
                     ? 'Rhetorical Devices & Syntax Challenge'
                     : 'Academic Vocabulary Mastery'}
@@ -197,10 +193,11 @@ function App() {
               <nav className="flex items-center gap-1 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200 dark:border-white/[0.08]">
                 {/* Home Command Tab (Red Style, in front of Vocab) */}
                 <button
-                  onClick={() => !isLoading && setSubject('home')}
-                  disabled={isLoading}
+                  onClick={() => !navLocked && setSubject('home')}
+                  disabled={navLocked}
+                  title={navLocked ? 'Locked while generating' : undefined}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 ${
-                    isLoading ? 'opacity-40 cursor-not-allowed' : ''
+                    navLocked ? 'opacity-40 cursor-not-allowed' : ''
                   } ${
                     isHome
                       ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
@@ -212,10 +209,11 @@ function App() {
                 </button>
 
                 <button
-                  onClick={() => !isLoading && setSubject('vocab')}
-                  disabled={isLoading}
+                  onClick={() => !navLocked && setSubject('vocab')}
+                  disabled={navLocked}
+                  title={navLocked ? 'Locked while generating' : undefined}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 ${
-                    isLoading ? 'opacity-40 cursor-not-allowed' : ''
+                    navLocked ? 'opacity-40 cursor-not-allowed' : ''
                   } ${
                     isVocab
                       ? 'bg-brand-600 text-white shadow-sm'
@@ -227,10 +225,11 @@ function App() {
                 </button>
 
                 <button
-                  onClick={() => !isLoading && setSubject('analogy')}
-                  disabled={isLoading}
+                  onClick={() => !navLocked && setSubject('analogy')}
+                  disabled={navLocked}
+                  title={navLocked ? 'Locked while generating' : undefined}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 ${
-                    isLoading ? 'opacity-40 cursor-not-allowed' : ''
+                    navLocked ? 'opacity-40 cursor-not-allowed' : ''
                   } ${
                     isAnalogy
                       ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-sm'
@@ -242,10 +241,11 @@ function App() {
                 </button>
 
                 <button
-                  onClick={() => !isLoading && setSubject('rhetoric')}
-                  disabled={isLoading}
+                  onClick={() => !navLocked && setSubject('rhetoric')}
+                  disabled={navLocked}
+                  title={navLocked ? 'Locked while generating' : undefined}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 ${
-                    isLoading ? 'opacity-40 cursor-not-allowed' : ''
+                    navLocked ? 'opacity-40 cursor-not-allowed' : ''
                   } ${
                     isRhetoric
                       ? 'bg-emerald-600 text-white shadow-sm'
@@ -257,10 +257,11 @@ function App() {
                 </button>
 
                 <button
-                  onClick={() => !isLoading && setSubject('passage')}
-                  disabled={isLoading}
+                  onClick={() => !navLocked && setSubject('passage')}
+                  disabled={navLocked}
+                  title={navLocked ? 'Locked while generating' : undefined}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 ${
-                    isLoading ? 'opacity-40 cursor-not-allowed' : ''
+                    navLocked ? 'opacity-40 cursor-not-allowed' : ''
                   } ${
                     isPassage
                       ? 'bg-amber-500 text-zinc-950 font-bold shadow-sm'
@@ -286,8 +287,9 @@ function App() {
 
               {/* API Key Modal Button */}
               <button
-                onClick={() => setIsApiKeyModalOpen(true)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 border ${
+                onClick={() => !navLocked && setIsApiKeyModalOpen(true)}
+                disabled={navLocked}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold tracking-tight transition-all duration-200 border disabled:opacity-40 disabled:cursor-not-allowed ${
                   apiKeyConfigured
                     ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20'
                     : 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 animate-pulse'
@@ -310,22 +312,25 @@ function App() {
         <main className="relative flex-1 px-4 pb-20 pt-8 md:px-8">
           {isLoading && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-md">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="card-glass p-8 rounded-3xl flex flex-col items-center gap-4 text-center max-w-sm shadow-luxury"
-              >
-                <div className="relative">
-                  <div className="h-14 w-14 rounded-full border-2 border-zinc-300 dark:border-white/10 border-t-brand-600 animate-spin" />
-                  <Sparkles className="h-6 w-6 text-brand-500 absolute inset-0 m-auto" />
-                </div>
-                <div>
-                  <h3 className="font-serif text-lg font-semibold text-zinc-900 dark:text-zinc-50">Synthesizing Content</h3>
-                  <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed">
-                    Querying Gemini intelligence engine with AP-level pedagogical rigor...
-                  </p>
-                </div>
-              </motion.div>
+              <div className="animate-modal-in card-glass p-8 rounded-3xl w-full max-w-sm mx-4 shadow-luxury">
+                {isRhetoric ? (
+                  <GenerationProgress
+                    theme="rhetoric"
+                    title="Building your rhetoric packet"
+                    steps={['Reading your rhetorical terms', 'Writing flashcards', 'Building the sentence game', 'Writing the AP-style quiz']}
+                    expectedSeconds={25}
+                    onCancel={cancelGeneration}
+                  />
+                ) : (
+                  <GenerationProgress
+                    theme="vocab"
+                    title="Building your study set"
+                    steps={['Reading your vocabulary list', 'Writing flashcards', 'Writing quiz questions', 'Pairing matching terms', 'Writing the practice paragraph']}
+                    expectedSeconds={25}
+                    onCancel={cancelGeneration}
+                  />
+                )}
+              </div>
             </div>
           )}
 
@@ -414,7 +419,10 @@ function App() {
             {isAnalogy && (
               <div className="relative">
                 <ErrorBoundary>
-                  <AnalogyQuiz onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)} />
+                  <AnalogyQuiz
+                    onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
+                    onGeneratingChange={setIsSectionGenerating}
+                  />
                 </ErrorBoundary>
               </div>
             )}
@@ -505,6 +513,7 @@ function App() {
                   activeRhetoricalTerms={rhetoricalTermsList}
                   activeVocabularyWords={vocabularyList}
                   onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
+                  onGeneratingChange={setIsSectionGenerating}
                 />
               </div>
             )}
@@ -528,7 +537,7 @@ function App() {
       <ApiKeyModal
         isOpen={isApiKeyModalOpen}
         onClose={() => setIsApiKeyModalOpen(false)}
-        onKeySaved={() => setApiKeyConfigured(Boolean(getStoredAPIKey()))}
+        theme={subject}
       />
     </div>
   );

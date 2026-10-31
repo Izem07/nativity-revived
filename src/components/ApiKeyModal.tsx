@@ -1,292 +1,391 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   KeyRound,
-  ShieldCheck,
   ExternalLink,
   CheckCircle2,
-  XCircle,
+  AlertCircle,
   ClipboardPaste,
   Eye,
   EyeOff,
-  Sparkles,
   Trash2,
   X,
   Loader2,
-  Plus,
   RefreshCw
 } from 'lucide-react';
 import { testAPIKey } from '../services/geminiService';
 import { globalKeyPool } from '../services/keyPoolService';
-import { Button } from './ui/Button';
+
+export type ApiKeyModalTheme = 'home' | 'vocab' | 'analogy' | 'rhetoric' | 'passage';
 
 interface ApiKeyModalProps {
   isOpen: boolean;
   onClose: () => void;
   onKeySaved?: (key: string) => void;
+  // Accent color follows the section the dialog was opened from
+  theme?: ApiKeyModalTheme;
 }
 
-export function ApiKeyModal({ isOpen, onClose, onKeySaved }: ApiKeyModalProps) {
+// Full class strings per section so Tailwind can see them at build time
+const THEMES: Record<
+  ApiKeyModalTheme,
+  { stripe: string; iconTile: string; link: string; step: string; inputFocus: string; button: string }
+> = {
+  home: {
+    stripe: 'from-rose-500 via-red-500 to-rose-600',
+    iconTile: 'bg-rose-500/10 border-rose-500/25 text-rose-600 dark:text-rose-400',
+    link: 'text-rose-700 dark:text-rose-400',
+    step: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20',
+    inputFocus: 'focus:border-rose-500',
+    button: 'text-white bg-rose-600 hover:bg-rose-500 shadow-rose-600/25 disabled:hover:bg-rose-600'
+  },
+  vocab: {
+    stripe: 'from-brand-500 via-brand-600 to-sky-500',
+    iconTile: 'bg-brand-500/10 border-brand-500/25 text-brand-600 dark:text-brand-400',
+    link: 'text-brand-700 dark:text-brand-300',
+    step: 'bg-brand-500/10 text-brand-700 dark:text-brand-300 border-brand-500/20',
+    inputFocus: 'focus:border-brand-500',
+    button: 'text-white bg-brand-600 hover:bg-brand-500 shadow-brand-600/25 disabled:hover:bg-brand-600'
+  },
+  analogy: {
+    stripe: 'from-violet-500 via-fuchsia-500 to-violet-600',
+    iconTile: 'bg-violet-500/10 border-violet-500/25 text-violet-600 dark:text-violet-400',
+    link: 'text-violet-700 dark:text-violet-300',
+    step: 'bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20',
+    inputFocus: 'focus:border-violet-500',
+    button: 'text-white bg-violet-600 hover:bg-violet-500 shadow-violet-600/25 disabled:hover:bg-violet-600'
+  },
+  rhetoric: {
+    stripe: 'from-emerald-400 via-emerald-500 to-teal-500',
+    iconTile: 'bg-emerald-500/10 border-emerald-500/25 text-emerald-600 dark:text-emerald-400',
+    link: 'text-emerald-700 dark:text-emerald-400',
+    step: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20',
+    inputFocus: 'focus:border-emerald-500',
+    button: 'text-white bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/25 disabled:hover:bg-emerald-600'
+  },
+  passage: {
+    stripe: 'from-amber-400 via-amber-500 to-yellow-500',
+    iconTile: 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400',
+    link: 'text-amber-700 dark:text-amber-400',
+    step: 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/25',
+    inputFocus: 'focus:border-amber-500',
+    button: 'text-zinc-950 bg-amber-500 hover:bg-amber-400 shadow-amber-500/25 disabled:hover:bg-amber-500'
+  }
+};
+
+type Status = { kind: 'idle' } | { kind: 'success'; message: string } | { kind: 'error'; message: string };
+
+const maskKey = (k: string) => `${k.slice(0, 6)}••••••${k.slice(-4)}`;
+
+export function ApiKeyModal({ isOpen, onClose, onKeySaved, theme = 'home' }: ApiKeyModalProps) {
+  const t = THEMES[theme];
   const [keyInput, setKeyInput] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [verifyStatus, setVerifyStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [poolKeys, setPoolKeys] = useState<string[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Only close on a click that both starts and ends on the backdrop, so dragging a
+  // text selection out of the input doesn't dismiss the dialog
+  const pressedBackdrop = useRef(false);
 
   useEffect(() => {
     if (isOpen) {
-      const keys = globalKeyPool.getKeys();
-      setPoolKeys(keys);
+      setPoolKeys(globalKeyPool.getKeys());
       setKeyInput('');
-      setVerifyStatus('idle');
-      setErrorMessage('');
+      setStatus({ kind: 'idle' });
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  // Kept in a ref so the open/close effect below doesn't re-run every time the parent re-renders
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCloseRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+
+    // Stop the page behind from scrolling while the dialog is open. Pad by the scrollbar's
+    // width so hiding it doesn't shift the page sideways.
+    const { body } = document;
+    const prevOverflow = body.style.overflow;
+    const prevPaddingRight = body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    body.style.overflow = 'hidden';
+    if (scrollbarWidth > 0) body.style.paddingRight = `${scrollbarWidth}px`;
+    const focusTimer = setTimeout(() => inputRef.current?.focus(), 50);
+
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      body.style.overflow = prevOverflow;
+      body.style.paddingRight = prevPaddingRight;
+      clearTimeout(focusTimer);
+    };
+  }, [isOpen]);
+
+  const updateInput = (value: string) => {
+    setKeyInput(value);
+    setStatus({ kind: 'idle' });
+  };
 
   const handlePaste = async () => {
     try {
-      if (navigator.clipboard) {
-        const text = await navigator.clipboard.readText();
-        if (text) {
-          setKeyInput(text.trim());
-          setVerifyStatus('idle');
-          setErrorMessage('');
-        }
-      }
+      const text = await navigator.clipboard?.readText();
+      if (text) updateInput(text.trim());
     } catch {
       // Ignore clipboard permission errors
     }
   };
 
   const handleVerifyAndAdd = async () => {
-    const raw = keyInput.trim();
-    if (!raw) {
-      setErrorMessage('Please enter an API key.');
-      setVerifyStatus('error');
+    // Support comma or newline separated batch entry
+    const candidates = Array.from(new Set(keyInput.split(/[\n,\s]+/).map((k) => k.trim()).filter(Boolean)));
+    if (candidates.length === 0) {
+      setStatus({ kind: 'error', message: 'Paste a Gemini API key first.' });
       return;
     }
 
-    // Support comma or newline separated batch entry
-    const candidates = raw.split(/[\n,]+/).map((k) => k.trim()).filter(Boolean);
-
     setIsVerifying(true);
-    setVerifyStatus('idle');
-    setErrorMessage('');
+    setStatus({ kind: 'idle' });
 
-    try {
-      // Verify first key as verification test
-      const testResult = await testAPIKey(candidates[0]);
-      if (testResult.valid) {
-        for (const candidate of candidates) {
-          globalKeyPool.addKey(candidate);
-        }
-        const updated = globalKeyPool.getKeys();
-        setPoolKeys(updated);
-        setKeyInput('');
-        setVerifyStatus('success');
-        onKeySaved?.(candidates[0]);
-      } else {
-        setVerifyStatus('error');
-        setErrorMessage(testResult.error || 'API Key verification failed. Please check your key.');
-      }
-    } catch (err: any) {
-      setVerifyStatus('error');
-      setErrorMessage(err?.message || 'Verification failed. Please check your network and API key.');
-    } finally {
-      setIsVerifying(false);
+    // Verify every key in parallel; each check is a single fast request
+    const results = await Promise.all(candidates.map((key) => testAPIKey(key)));
+    const valid = candidates.filter((_, i) => results[i].valid);
+    const invalidCount = candidates.length - valid.length;
+
+    for (const key of valid) globalKeyPool.addKey(key);
+    setPoolKeys(globalKeyPool.getKeys());
+    setIsVerifying(false);
+
+    if (valid.length === 0) {
+      setStatus({ kind: 'error', message: results[0].error || 'That key could not be verified.' });
+      return;
     }
+
+    setKeyInput('');
+    onKeySaved?.(valid[0]);
+    setStatus({
+      kind: invalidCount > 0 ? 'error' : 'success',
+      message:
+        invalidCount > 0
+          ? `Added ${valid.length} key${valid.length === 1 ? '' : 's'}. ${invalidCount} couldn't be verified and ${invalidCount === 1 ? 'was' : 'were'} skipped.`
+          : valid.length === 1
+            ? 'Key verified and added.'
+            : `${valid.length} keys verified and added.`
+    });
   };
 
   const handleRemoveKey = (idx: number) => {
     globalKeyPool.removeKey(idx);
     const updated = globalKeyPool.getKeys();
     setPoolKeys(updated);
-    if (updated.length === 0) {
-      onKeySaved?.('');
-    }
+    setStatus({ kind: 'idle' });
+    if (updated.length === 0) onKeySaved?.('');
   };
 
+  if (!isOpen) return null;
+
+  const hasKeys = poolKeys.length > 0;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-slate-950/80 backdrop-blur-md">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/[0.08] p-6 sm:p-8 shadow-2xl space-y-6 text-zinc-900 dark:text-white overflow-hidden max-h-[90vh] overflow-y-auto transition-colors"
+    <div
+      onMouseDown={(e) => {
+        pressedBackdrop.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        if (pressedBackdrop.current && e.target === e.currentTarget) onClose();
+        pressedBackdrop.current = false;
+      }}
+      className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 dark:bg-black/80"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="api-key-title"
+        // Plain CSS fade-in: framer-motion's opacity animation blinked to 0 for a frame on finish
+        className="animate-modal-in relative w-full max-w-md rounded-3xl overflow-hidden max-h-[90vh] flex flex-col bg-white dark:bg-zinc-925 border border-zinc-200 dark:border-white/[0.08] shadow-2xl text-zinc-900 dark:text-zinc-100"
       >
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/5 transition-colors"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <div className={`h-[3px] bg-gradient-to-r ${t.stripe}`} />
 
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-2xl bg-amber-500/10 dark:bg-gradient-to-br dark:from-amber-400/20 dark:to-yellow-500/20 border border-amber-500/30 text-amber-600 dark:text-amber-400">
-            <KeyRound className="h-6 w-6" />
+        <div className="flex items-start gap-3.5 px-6 sm:px-7 pt-6 pb-5">
+          <div className={`p-2.5 rounded-xl border ${t.iconTile}`}>
+            <KeyRound className="h-5 w-5" />
           </div>
-          <div>
-            <h3 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-              Gemini API Key Pool
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                Auto-Failover
-              </span>
+          <div className="flex-1 min-w-0">
+            <h3 id="api-key-title" className="font-serif text-2xl font-semibold tracking-tight leading-tight">
+              Gemini API keys
             </h3>
-            <p className="text-xs text-zinc-500 dark:text-slate-400">
-              Rotates across your free keys automatically when rate limits (429) are reached.
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+              Nativity uses your free Gemini keys to generate study material. Add more than one and it switches
+              automatically when a key hits its limit.
             </p>
           </div>
-        </div>
-
-        {/* Free API Key Banner & Guide */}
-        <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/80 dark:border-white/5 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-800 dark:text-slate-200 flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" /> Get 100% Free Gemini API Keys
-            </span>
-            <a
-              href="https://aistudio.google.com/app/apikey"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 hover:text-amber-500 underline"
-            >
-              Google AI Studio <ExternalLink className="h-3 w-3" />
-            </a>
-          </div>
-          <p className="text-[11px] text-zinc-600 dark:text-slate-400 leading-relaxed">
-            Create 1, 2, or more free keys. When you add multiple keys, Nativity rotates between them automatically to prevent rate limits!
-          </p>
-        </div>
-
-        {/* Existing Key Pool List */}
-        {poolKeys.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-slate-400 px-1">
-              <span className="font-semibold text-zinc-700 dark:text-slate-300">
-                Active Key Pool ({poolKeys.length} {poolKeys.length === 1 ? 'Key' : 'Keys'} Configured)
-              </span>
-              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-semibold">
-                <RefreshCw className="h-3 w-3" /> Auto-Failover Ready
-              </span>
-            </div>
-
-            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-              {poolKeys.map((k, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-white/10 text-xs"
-                >
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                    <span className="text-zinc-700 dark:text-slate-300 font-mono text-[11px]">
-                      Key #{idx + 1}: {k.slice(0, 6)}••••••••{k.slice(-4)}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleRemoveKey(idx)}
-                    className="text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 p-1 rounded-md transition-colors"
-                    title="Remove Key"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Input Field with Quick Actions */}
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-zinc-700 dark:text-slate-300 block">
-            {poolKeys.length === 0 ? 'Enter Gemini API Key' : 'Add Another Key to Pool'}
-          </label>
-          <div className="relative flex items-center">
-            <input
-              type={showKey ? 'text' : 'password'}
-              value={keyInput}
-              onChange={(e) => {
-                setKeyInput(e.target.value);
-                setVerifyStatus('idle');
-                setErrorMessage('');
-              }}
-              placeholder="AIzaSy... (Paste one or more keys)"
-              className="w-full bg-zinc-50 dark:bg-zinc-950/80 border border-zinc-300 dark:border-slate-700 focus:border-amber-500 dark:focus:border-amber-400 rounded-2xl py-3 pl-4 pr-24 text-sm text-zinc-900 dark:text-slate-100 placeholder-zinc-400 dark:placeholder-slate-500 focus:outline-none transition-colors font-mono"
-            />
-            <div className="absolute right-2 flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handlePaste}
-                title="Paste from clipboard"
-                className="p-1.5 rounded-lg bg-zinc-200 dark:bg-slate-800 text-zinc-700 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-300 dark:hover:bg-slate-700 transition-colors text-xs flex items-center gap-1"
-              >
-                <ClipboardPaste className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowKey((prev) => !prev)}
-                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:text-slate-400 dark:hover:text-white transition-colors"
-              >
-                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Status / Error Message */}
-        <AnimatePresence>
-          {verifyStatus === 'error' && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="flex items-start gap-2 p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-200 text-xs"
-            >
-              <XCircle className="h-4 w-4 text-rose-400 flex-shrink-0 mt-0.5" />
-              <span>{errorMessage}</span>
-            </motion.div>
-          )}
-
-          {verifyStatus === 'success' && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="flex items-center gap-2 p-3 rounded-xl bg-emerald-950/50 border border-emerald-500/40 text-emerald-200 text-xs"
-            >
-              <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0" />
-              <span>Key verified and added to the pool successfully!</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Action Buttons */}
-        <div className="flex items-center justify-between pt-2">
-          <Button onClick={onClose} variant="ghost" size="small" className="text-slate-400">
-            {poolKeys.length > 0 ? 'Done' : 'Cancel'}
-          </Button>
-
-          <Button
-            onClick={handleVerifyAndAdd}
-            disabled={isVerifying || !keyInput.trim()}
-            variant="primary"
-            className="bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-bold px-5"
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="-mr-2 -mt-1 p-2 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors"
           >
-            {isVerifying ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...
-              </>
-            ) : (
-              <>
-                <Plus className="mr-1.5 h-4 w-4" /> Verify & Add to Pool
-              </>
-            )}
-          </Button>
+            <X className="h-4 w-4" />
+          </button>
         </div>
-      </motion.div>
+
+        <div className="px-6 sm:px-7 pb-6 space-y-5 overflow-y-auto">
+          {/* Key list */}
+          {hasKeys ? (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-mono tracking-wider uppercase font-semibold text-zinc-500 dark:text-zinc-400">
+                  Connected · {poolKeys.length}
+                </span>
+                {poolKeys.length > 1 && (
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
+                    <RefreshCw className="h-3 w-3" /> Auto-switching on
+                  </span>
+                )}
+              </div>
+              <ul className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] divide-y divide-zinc-200 dark:divide-white/[0.06] max-h-40 overflow-y-auto">
+                {poolKeys.map((k, idx) => (
+                  <li key={k} className="group flex items-center gap-3 px-3.5 py-2.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981] flex-shrink-0" />
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400 w-10 flex-shrink-0">Key {idx + 1}</span>
+                    <span className="font-mono text-xs text-zinc-800 dark:text-zinc-200 flex-1 truncate">
+                      {maskKey(k)}
+                    </span>
+                    <button
+                      onClick={() => handleRemoveKey(idx)}
+                      aria-label={`Remove key ${idx + 1}`}
+                      className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 opacity-60 group-hover:opacity-100 transition-all"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <ol className="rounded-2xl bg-zinc-50 dark:bg-white/[0.03] border border-zinc-200 dark:border-white/[0.06] p-4 space-y-2.5 text-xs text-zinc-600 dark:text-zinc-300">
+              {[
+                <>
+                  Open{' '}
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`inline-flex items-center gap-0.5 font-semibold hover:underline underline-offset-2 ${t.link}`}
+                  >
+                    Google AI Studio <ExternalLink className="h-3 w-3" />
+                  </a>{' '}
+                  and sign in.
+                </>,
+                <>Click <span className="font-semibold text-zinc-900 dark:text-white">Create API key</span>. It's free.</>,
+                <>Paste it below.</>
+              ].map((step, i) => (
+                <li key={i} className="flex items-center gap-3">
+                  <span className={`h-5 w-5 rounded-full flex-shrink-0 flex items-center justify-center font-mono text-[10px] font-semibold border ${t.step}`}>
+                    {i + 1}
+                  </span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {/* Input */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!isVerifying && keyInput.trim()) handleVerifyAndAdd();
+            }}
+            className="space-y-3"
+          >
+            <label htmlFor="api-key-input" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 block">
+              {hasKeys ? 'Add another key' : 'Your API key'}
+            </label>
+            <div className="relative">
+              <input
+                id="api-key-input"
+                ref={inputRef}
+                type={showKey ? 'text' : 'password'}
+                value={keyInput}
+                onChange={(e) => updateInput(e.target.value)}
+                placeholder="AIzaSy…"
+                autoComplete="off"
+                spellCheck={false}
+                disabled={isVerifying}
+                className={`w-full rounded-xl py-3 pl-4 pr-20 font-mono text-base sm:text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-white/[0.1] placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none disabled:opacity-60 ${t.inputFocus}`}
+              />
+              <div className="absolute inset-y-0 right-1.5 flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={handlePaste}
+                  aria-label="Paste from clipboard"
+                  title="Paste"
+                  className="p-2 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors"
+                >
+                  <ClipboardPaste className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowKey((prev) => !prev)}
+                  aria-label={showKey ? 'Hide key' : 'Show key'}
+                  title={showKey ? 'Hide' : 'Show'}
+                  className="p-2 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors"
+                >
+                  {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-500">
+              Separate multiple keys with commas. Keys are stored only in this browser.
+            </p>
+
+            {status.kind !== 'idle' && (
+              <div role="status">
+                <div
+                  className={`flex items-start gap-2 p-3 rounded-xl text-xs border ${
+                    status.kind === 'success'
+                      ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-800 dark:text-emerald-200'
+                      : 'bg-rose-500/10 border-rose-500/25 text-rose-800 dark:text-rose-200'
+                  }`}
+                >
+                  {status.kind === 'success' ? (
+                    <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 flex-shrink-0 text-rose-600 dark:text-rose-400" />
+                  )}
+                  <span className="leading-relaxed">{status.message}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors"
+              >
+                {hasKeys ? 'Done' : 'Cancel'}
+              </button>
+              <button
+                type="submit"
+                disabled={isVerifying || !keyInput.trim()}
+                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold shadow-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${t.button}`}
+              >
+                {isVerifying ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking…
+                  </>
+                ) : (
+                  'Verify & add'
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

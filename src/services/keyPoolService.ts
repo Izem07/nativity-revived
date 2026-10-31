@@ -1,4 +1,63 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getActiveSignal, cancelledError } from './generationControl';
+
+// Waits ms, but rejects right away if the generation is cancelled
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(cancelledError());
+    const id = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(id);
+      reject(cancelledError());
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+// Settles with the promise, or rejects as soon as the signal aborts (the late result is ignored)
+function raceAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise;
+  return new Promise<T>((resolve, reject) => {
+    if (signal.aborted) return reject(cancelledError());
+    const onAbort = () => reject(cancelledError());
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (v) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(v);
+      },
+      (e) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(e);
+      }
+    );
+  });
+}
+
+// ---- Speed: what we've learned about models this session ----
+// Daily free quota used up, per key (other keys still have their own quota). Cleared on reload.
+const exhaustedModelsByKey = new Map<string, Set<string>>();
+// Model names that don't exist for this API (retired/renamed)
+const missingModels = new Set<string>();
+// Models returning 503 "overloaded": skipped until this timestamp
+const busyModelsUntil = new Map<string, number>();
+const BUSY_COOLDOWN_MS = 60_000;
+// Models that rejected the thinkingConfig field, so we stop sending it to them
+const modelsRejectingThinking = new Set<string>();
+
+/**
+ * Extra generationConfig for study-set generation. Lower thinking makes Flash models start
+ * answering much sooner; if a model rejects the setting it's dropped automatically for that model.
+ */
+export function speedConfig(modelName: string): Record<string, unknown> {
+  return modelsRejectingThinking.has(modelName) ? {} : { thinkingConfig: { thinkingLevel: 'low' } };
+}
+
+// Fired on window whenever the saved key list changes, so UI can update without a reload
+export const KEYS_CHANGED_EVENT = 'gemini-keys-changed';
 
 export interface KeyPoolStatus {
   totalKeys: number;
@@ -74,6 +133,7 @@ export class KeyPool {
     } else {
       localStorage.removeItem('GEMINI_API_KEY');
     }
+    window.dispatchEvent(new Event(KEYS_CHANGED_EVENT));
   }
 
   public addKey(key: string): void {
@@ -126,9 +186,17 @@ export class KeyPool {
    * Executes a Gemini API call with automatic key rotation and model fallback on 429/ResourceExhausted or quota errors
    */
   public async executeWithRotation<T>(
-    operation: (genAI: GoogleGenerativeAI, activeKey: string, activeModelName: string) => Promise<T>,
+    operation: (
+      genAI: GoogleGenerativeAI,
+      activeKey: string,
+      activeModelName: string,
+      // Pass to generateContent(request, { signal }) so Cancel stops the network request too
+      signal?: AbortSignal
+    ) => Promise<T>,
     maxRetries?: number
   ): Promise<T> {
+    // Set when this call is part of a cancellable study-set generation
+    const signal = getActiveSignal();
     this.refreshKeysFromStorage();
     if (this.keys.length === 0) {
       throw new Error('No API key found. Please connect your free Gemini API key to proceed.');
@@ -143,80 +211,148 @@ export class KeyPool {
       'gemini-3.5-flash-lite',
       'gemini-3.1-flash-lite'
     ];
-    let modelIndex = 0;
+    const isUsable = (model: string, key: string) =>
+      !missingModels.has(model) &&
+      !exhaustedModelsByKey.get(key)?.has(model) &&
+      (busyModelsUntil.get(model) ?? 0) <= Date.now();
+
+    // Next model after `from` that's worth trying with this key (or simply the next one if none are)
+    const nextModel = (from: number, key: string) => {
+      for (let step = 1; step <= modelCandidates.length; step++) {
+        const i = (from + step) % modelCandidates.length;
+        if (isUsable(modelCandidates[i], key)) return i;
+      }
+      return (from + 1) % modelCandidates.length;
+    };
+
+    // Start on the first model we haven't already seen fail this session
+    const firstKey = this.getCurrentKey();
+    let modelIndex = isUsable(modelCandidates[0], firstKey) ? 0 : nextModel(0, firstKey);
+    let rateLimitFallbacks = 0;
 
     const retries = maxRetries ?? Math.max(this.keys.length * modelCandidates.length * 2, 8);
     let attempts = 0;
     let lastError: any = null;
 
+    // Exponential backoff with jitter for transient server errors: ~0.5s, 1s, 2s, 4s, then 8s max
+    let backoffStep = 0;
+    const backoff = () => {
+      const delay = Math.min(500 * 2 ** backoffStep, 8000) + Math.random() * 250;
+      backoffStep++;
+      return sleep(delay, signal);
+    };
+
     while (attempts < retries) {
+      if (signal?.aborted) throw cancelledError();
       const activeKey = this.getCurrentKey();
       const genAI = new GoogleGenerativeAI(activeKey);
-      const activeModelName = modelCandidates[modelIndex % modelCandidates.length];
+      const activeModelName = modelCandidates[modelIndex];
 
       try {
-        return await operation(genAI, activeKey, activeModelName);
+        return await raceAbort(operation(genAI, activeKey, activeModelName, signal), signal);
       } catch (err: any) {
+        // A cancel is never retried or reported as a failure
+        if (signal?.aborted) throw cancelledError();
         lastError = err;
+        attempts++;
         const errMsg = String(err?.message || err);
-        const isDemandOrServiceUnavailable =
+
+        // Google is overloaded or hiccuping (503 / 500): try another model after a growing wait
+        const isServerBusy =
           errMsg.includes('503') ||
+          errMsg.includes('[500') ||
           errMsg.includes('high demand') ||
           errMsg.includes('temporarily unavailable') ||
           errMsg.includes('overloaded');
 
-        const isQuotaOrRateLimit =
-          errMsg.includes('429') ||
-          isDemandOrServiceUnavailable ||
-          errMsg.includes('RESOURCE_EXHAUSTED') ||
-          errMsg.includes('Quota exceeded') ||
-          errMsg.includes('rate limit') ||
+        // This model name doesn't exist (retired or not available to this key): skip it
+        const isModelMissing =
+          errMsg.includes('404') || errMsg.includes('is not found') || errMsg.includes('not supported for generateContent');
+
+        // The key itself is bad or lacks Gemini access: retrying the same key can't help
+        const isBadKey =
+          errMsg.includes('API_KEY_INVALID') ||
+          errMsg.includes('API key not valid') ||
+          errMsg.includes('PERMISSION_DENIED') ||
           errMsg.includes('403');
 
-        // Check if a specific model free tier quota was exhausted (like 20 RPD limit on 3.8-flash)
+        // A specific model's free-tier daily quota is used up (e.g. requests-per-day limit)
         const isModelQuotaExhausted =
           errMsg.includes('Quota exceeded for metric') ||
           errMsg.includes('GenerateRequestsPerDay') ||
           errMsg.includes('free_tier_requests');
 
-        // If the current model is overloaded (503 / high demand) or exhausted its daily quota,
-        // instantly switch to the next fallback model candidate (e.g. gemini-2.5-flash)
-        if (isDemandOrServiceUnavailable || isModelQuotaExhausted) {
-          console.warn(`[KeyPool] Model ${activeModelName} returned ${isDemandOrServiceUnavailable ? '503 High Demand' : 'Daily Quota Exhaustion'}. Switching to alternate model in cascade...`);
-          modelIndex++;
-          attempts++;
-          await new Promise((r) => setTimeout(r, 400));
+        // This model doesn't accept the thinkingConfig we sent (see speedConfig)
+        const isThinkingRejected = /thinking/i.test(errMsg) && (errMsg.includes('400') || errMsg.includes('INVALID_ARGUMENT'));
+
+        const isRateLimit =
+          errMsg.includes('429') ||
+          errMsg.includes('RESOURCE_EXHAUSTED') ||
+          errMsg.includes('Quota exceeded') ||
+          errMsg.includes('rate limit');
+
+        if (isThinkingRejected && !modelsRejectingThinking.has(activeModelName)) {
+          console.warn(`[KeyPool] ${activeModelName} doesn't accept thinkingConfig. Retrying without it...`);
+          modelsRejectingThinking.add(activeModelName);
           continue;
         }
 
-        if (isQuotaOrRateLimit && this.keys.length > 1) {
-          console.warn(`[KeyPool] Key ${this.currentIndex + 1} hit rate-limit or quota. Rotating to next key in pool...`);
-          this.rotateKey();
-          attempts++;
-          await new Promise((r) => setTimeout(r, 1000));
-          continue;
-        }
-
-        if (isQuotaOrRateLimit) {
-          // If single key hit rate limit, try falling back to next available model first
-          if (modelIndex < modelCandidates.length - 1) {
-            modelIndex++;
-            attempts++;
-            console.warn(`[KeyPool] Attempting fallback to ${modelCandidates[modelIndex]}...`);
-            await new Promise((r) => setTimeout(r, 600));
+        if (isBadKey) {
+          if (this.keys.length > 1) {
+            console.warn(`[KeyPool] Key ${this.currentIndex + 1} was rejected. Rotating to next key in pool...`);
+            this.rotateKey();
             continue;
           }
+          throw new Error("Your Gemini API key was rejected. Open the API key screen and add a valid key.");
+        }
 
-          attempts++;
-          console.warn(`[KeyPool] Temporary rate limit. Retrying in ${1.2 * attempts}s (attempt ${attempts}/${retries})...`);
-          await new Promise((r) => setTimeout(r, 1200 * attempts));
+        if (isModelMissing) {
+          console.warn(`[KeyPool] Model ${activeModelName} is unavailable. Trying the next model...`);
+          missingModels.add(activeModelName);
+          modelIndex = nextModel(modelIndex, activeKey);
           continue;
         }
 
-        // Other errors (e.g. malformed model response)
-        attempts++;
+        if (isServerBusy) {
+          console.warn(`[KeyPool] ${activeModelName} is busy (503). Backing off, then trying the next model...`);
+          busyModelsUntil.set(activeModelName, Date.now() + BUSY_COOLDOWN_MS);
+          modelIndex = nextModel(modelIndex, activeKey);
+          await backoff();
+          continue;
+        }
+
+        if (isModelQuotaExhausted) {
+          console.warn(`[KeyPool] ${activeModelName} daily quota used up. Switching to the next model...`);
+          if (!exhaustedModelsByKey.has(activeKey)) exhaustedModelsByKey.set(activeKey, new Set());
+          exhaustedModelsByKey.get(activeKey)!.add(activeModelName);
+          modelIndex = nextModel(modelIndex, activeKey);
+          await sleep(400, signal);
+          continue;
+        }
+
+        if (isRateLimit) {
+          if (this.keys.length > 1) {
+            console.warn(`[KeyPool] Key ${this.currentIndex + 1} hit a rate limit. Rotating to next key in pool...`);
+            this.rotateKey();
+            await sleep(500, signal);
+            continue;
+          }
+          // Single key: try a lighter model first, then wait it out
+          if (rateLimitFallbacks < modelCandidates.length - 1) {
+            rateLimitFallbacks++;
+            modelIndex = nextModel(modelIndex, activeKey);
+            console.warn(`[KeyPool] Rate limited. Falling back to ${modelCandidates[modelIndex]}...`);
+            await sleep(600, signal);
+            continue;
+          }
+          console.warn(`[KeyPool] Rate limited. Backing off (attempt ${attempts}/${retries})...`);
+          await backoff();
+          continue;
+        }
+
+        // Other errors (e.g. malformed model output): retry shortly
         if (attempts >= retries) throw err;
-        await new Promise((r) => setTimeout(r, 1000));
+        await sleep(1000, signal);
       }
     }
 

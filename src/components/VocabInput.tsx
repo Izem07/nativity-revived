@@ -5,7 +5,6 @@ import {
   Sparkles,
   KeyRound,
   X,
-  ShieldCheck,
   ClipboardPaste,
   Info,
   Database,
@@ -13,8 +12,12 @@ import {
   ArrowRight,
   Layers
 } from 'lucide-react';
-import { generateQuizContent, QuizGenerationResult, getStoredAPIKey } from '../services/geminiService';
+import { generateQuizContent, QuizGenerationResult } from '../services/geminiService';
 import { getCachedResult, setCachedResult } from '../services/cacheService';
+import { KeyStatusPanel } from './KeyStatusPanel';
+import { useHasApiKey } from '../hooks/useHasApiKey';
+import { ConfirmDialog } from './ConfirmDialog';
+import { beginGeneration, endGeneration, isCancelledError } from '../services/generationControl';
 
 interface VocabInputProps {
   onGenerate: (result: QuizGenerationResult, vocabList: string[]) => void;
@@ -72,6 +75,9 @@ const PRE_FILLED_LISTS = [
 ] as const;
 
 export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: VocabInputProps) {
+  const hasKey = useHasApiKey();
+  // Saved set waiting for the user to confirm loading it
+  const [pendingCached, setPendingCached] = useState<ReturnType<typeof getCachedResult>>(null);
   const [vocabList, setVocabList] = useState<string[]>(['']);
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -151,9 +157,8 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
     // If specific words entered, check for them; otherwise check if ANY cached vocab set exists
     const cached = getCachedResult(normalized.length >= 3 ? normalized : undefined);
     if (cached) {
-      onGenerate(cached.data, cached.words);
-      onLoadingChange(false);
       setError(null);
+      setPendingCached(cached);
     } else {
       setError('No cached study set found in local storage. Generate one first!');
     }
@@ -189,11 +194,18 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
     setIsGenerating(true);
     onLoadingChange(true);
 
+    const signal = beginGeneration();
     try {
       const result = await generateQuizContent(normalized);
+      if (signal.aborted) return;
       setCachedResult(normalized, result);
       onGenerate(result, normalized);
     } catch (generateError) {
+      if (signal.aborted || isCancelledError(generateError)) {
+        // Cancelled by the user: back to the setup screen quietly
+        onLoadingChange(false);
+        return;
+      }
       setError(
         generateError instanceof Error
           ? generateError.message
@@ -201,6 +213,7 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
       );
       onLoadingChange(false);
     } finally {
+      endGeneration(signal);
       setIsGenerating(false);
     }
   };
@@ -374,12 +387,12 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
               </div>
 
               <button
-                onClick={handleGenerateClick}
-                disabled={isGenerating || filledCount < 3}
+                onClick={hasKey ? handleGenerateClick : onOpenApiKeyModal}
+                disabled={hasKey && (isGenerating || filledCount < 3)}
                 className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 via-indigo-600 to-sky-600 text-white font-semibold text-xs tracking-wide uppercase shadow-md shadow-brand-500/25 hover:shadow-brand-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40"
               >
-                <Sparkles className="h-4 w-4" />
-                <span>{isGenerating ? 'Synthesizing...' : 'Generate Study Materials'}</span>
+                {hasKey ? <Sparkles className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}
+                <span>{!hasKey ? 'Add API key to generate' : isGenerating ? 'Synthesizing...' : 'Generate Study Materials'}</span>
               </button>
             </div>
           </div>
@@ -396,33 +409,35 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
         )}
 
         {/* Bottom Feature Badges */}
-        <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-white/[0.08] grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="flex items-start gap-3 p-4 rounded-2xl bg-zinc-50 dark:bg-white/[0.02] border border-zinc-200 dark:border-white/[0.06]">
-            <ShieldCheck className="h-5 w-5 text-emerald-500 flex-shrink-0 mt-0.5" />
-            <div>
-              <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">Private & Local Storage</h4>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                API credentials and generated flashcards remain encrypted strictly within your browser.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between p-4 rounded-2xl bg-zinc-50 dark:bg-white/[0.02] border border-zinc-200 dark:border-white/[0.06]">
-            <div>
-              <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">Gemini Key Management</h4>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                {getStoredAPIKey() ? 'Key pool active & connected' : 'Connect free Gemini API key'}
-              </p>
-            </div>
-            <button
-              onClick={onOpenApiKeyModal}
-              className="px-3.5 py-1.5 rounded-xl border border-zinc-300 dark:border-white/[0.1] bg-white dark:bg-white/[0.05] text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:border-brand-500 transition-colors"
-            >
-              Configure
-            </button>
-          </div>
-        </div>
+        <KeyStatusPanel theme="vocab" onOpenApiKeyModal={onOpenApiKeyModal} className="mt-8" />
       </div>
+
+      <ConfirmDialog
+        isOpen={pendingCached !== null}
+        theme="vocab"
+        title="Load your saved study set?"
+        message={
+          pendingCached && (
+            <>
+              Opens the study set you saved for {pendingCached.words.length} words:{' '}
+              <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                {pendingCached.words.slice(0, 5).join(', ')}
+                {pendingCached.words.length > 5 ? ', …' : ''}
+              </span>
+              . It loads instantly and doesn't use any API credits.
+            </>
+          )
+        }
+        confirmLabel="Load saved study set"
+        onCancel={() => setPendingCached(null)}
+        onConfirm={() => {
+          if (pendingCached) {
+            onGenerate(pendingCached.data, pendingCached.words);
+            onLoadingChange(false);
+          }
+          setPendingCached(null);
+        }}
+      />
 
       {/* Confirmation Modal */}
       {confirmGenerateOpen && (

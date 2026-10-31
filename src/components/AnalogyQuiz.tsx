@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   RotateCcw,
@@ -19,7 +19,8 @@ import {
   SlidersHorizontal,
   Database,
   Library,
-  Check
+  Check,
+  KeyRound
 } from 'lucide-react';
 import {
   AnalogyQuestion,
@@ -29,10 +30,36 @@ import {
   getCachedAnalogies,
   lookupWordDefinition,
   bulkPreloadDefinitions,
-  WordDefinitionResult
+  WordDefinitionResult,
+  CATEGORY_LABELS
 } from '../services/analogyService';
+import { KeyStatusPanel } from './KeyStatusPanel';
+import { GenerationProgress } from './GenerationProgress';
+import { useHasApiKey } from '../hooks/useHasApiKey';
+import { ConfirmDialog } from './ConfirmDialog';
+import { beginGeneration, endGeneration, cancelGeneration, isCancelledError } from '../services/generationControl';
 
 const CATEGORY_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  DEFINITION: {
+    bg: 'bg-indigo-500/10',
+    border: 'border-indigo-500/20',
+    text: 'text-indigo-600 dark:text-indigo-300'
+  },
+  SYNONYM: {
+    bg: 'bg-teal-500/10',
+    border: 'border-teal-500/20',
+    text: 'text-teal-600 dark:text-teal-300'
+  },
+  ANTONYM: {
+    bg: 'bg-orange-500/10',
+    border: 'border-orange-500/20',
+    text: 'text-orange-600 dark:text-orange-300'
+  },
+  TYPE_KIND: {
+    bg: 'bg-purple-500/10',
+    border: 'border-purple-500/20',
+    text: 'text-purple-600 dark:text-purple-300'
+  },
   DEGREE: {
     bg: 'bg-rose-500/10',
     border: 'border-rose-500/20',
@@ -48,20 +75,10 @@ const CATEGORY_COLORS: Record<string, { bg: string; border: string; text: string
     border: 'border-amber-500/20',
     text: 'text-amber-600 dark:text-amber-300'
   },
-  CHARACTERISTIC: {
-    bg: 'bg-purple-500/10',
-    border: 'border-purple-500/20',
-    text: 'text-purple-600 dark:text-purple-300'
-  },
   PART_WHOLE: {
     bg: 'bg-emerald-500/10',
     border: 'border-emerald-500/20',
     text: 'text-emerald-600 dark:text-emerald-300'
-  },
-  SYNONYM_INTENSITY: {
-    bg: 'bg-fuchsia-500/10',
-    border: 'border-fuchsia-500/20',
-    text: 'text-fuchsia-600 dark:text-fuchsia-300'
   }
 };
 
@@ -73,11 +90,18 @@ const DEFAULT_COLOR = {
 
 const INTENSITIES: AnalogyIntensity[] = ['Easy', 'Standard', 'Challenging', 'Advanced'];
 
+const categoryLabel = (category: string) => CATEGORY_LABELS[category] || category.replace(/_/g, ' ');
+
 interface AnalogyQuizProps {
   onOpenApiKeyModal: () => void;
+  // Lets the app lock navigation while a set is being generated
+  onGeneratingChange?: (isGenerating: boolean) => void;
 }
 
-export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) => {
+export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal, onGeneratingChange }) => {
+  const hasKey = useHasApiKey();
+  // Saved set waiting for the user to confirm loading it
+  const [pendingCached, setPendingCached] = useState<AnalogySet | null>(null);
   const [selectedIntensity, setSelectedIntensity] = useState<AnalogyIntensity>('Standard');
   const [analogySet, setAnalogySet] = useState<AnalogySet | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -104,40 +128,38 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
   const [showVocabDrawer, setShowVocabDrawer] = useState(false);
   const [bulkDefinitions, setBulkDefinitions] = useState<Record<string, WordDefinitionResult>>({});
 
-  // Load from cache on mount only if valid
-  useEffect(() => {
-    try {
-      const cached = getCachedAnalogies(selectedIntensity);
-      if (
-        cached &&
-        Array.isArray(cached.questions) &&
-        cached.questions.length > 0 &&
-        cached.questions[0]?.pair &&
-        Array.isArray(cached.questions[0]?.choices)
-      ) {
-        setAnalogySet(cached);
-      } else {
-        setAnalogySet(null);
-      }
-    } catch {
-      setAnalogySet(null);
-    }
-  }, [selectedIntensity]);
+  // Start a set from question 1 with a fresh score and streaks
+  const startSet = (set: AnalogySet) => {
+    setAnalogySet(set);
+    setCurrentIndex(0);
+    setSelectedChoice(null);
+    setIsAnswerSubmitted(false);
+    setShowExplanation(false);
+    setScore(0);
+    setStreak(0);
+    setBestStreak(0);
+  };
 
   const handleFetchAnalogies = async (overrideIntensity?: AnalogyIntensity) => {
+    if (!hasKey) {
+      setShowRefreshMenu(false);
+      onOpenApiKeyModal();
+      return;
+    }
     const intensityToUse = overrideIntensity || selectedIntensity;
     setShowRefreshMenu(false);
     setIsLoading(true);
+    onGeneratingChange?.(true);
     setError(null);
+    const signal = beginGeneration();
     try {
       const data = await generateAnalogies(8, intensityToUse);
+      if (signal.aborted) return;
       setSelectedIntensity(intensityToUse);
-      setAnalogySet(data);
-      setCurrentIndex(0);
-      setSelectedChoice(null);
-      setIsAnswerSubmitted(false);
-      setShowExplanation(false);
+      startSet(data);
     } catch (err: any) {
+      // Cancelled by the user: return to whatever was on screen before
+      if (signal.aborted || isCancelledError(err)) return;
       console.error(err);
       if (String(err?.message || '').includes('API key')) {
         setError('Please configure your Gemini API Key first.');
@@ -146,29 +168,10 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
         setError(err?.message || 'Failed to generate analogies. Please check your connection or quota.');
       }
     } finally {
+      endGeneration(signal);
       setIsLoading(false);
+      onGeneratingChange?.(false);
     }
-  };
-
-  // Extract all unique words across the current analogy set
-  const getAllSetWords = (): string[] => {
-    if (!analogySet || !Array.isArray(analogySet.questions)) return [];
-    const set = new Set<string>();
-    for (const q of analogySet.questions) {
-      if (Array.isArray(q.pair)) {
-        if (q.pair[0]) set.add(q.pair[0]);
-        if (q.pair[1]) set.add(q.pair[1]);
-      }
-      if (Array.isArray(q.choices)) {
-        for (const c of q.choices) {
-          if (Array.isArray(c)) {
-            if (c[0]) set.add(c[0]);
-            if (c[1]) set.add(c[1]);
-          }
-        }
-      }
-    }
-    return Array.from(set);
   };
 
   // Extract words for only the current question (saving network calls and AI credits)
@@ -204,26 +207,6 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
       setShowVocabDrawer(true);
     } catch (e) {
       console.error('Failed preload question:', e);
-    } finally {
-      setIsBulkLoading(false);
-      setBulkProgress(null);
-    }
-  };
-
-  const handleBulkPreload = async () => {
-    const allWords = getAllSetWords();
-    if (allWords.length === 0) return;
-
-    setIsBulkLoading(true);
-    setBulkProgress({ loaded: 0, total: allWords.length });
-    try {
-      const defs = await bulkPreloadDefinitions(allWords, (loaded, total) => {
-        setBulkProgress({ loaded, total });
-      });
-      setBulkDefinitions(defs);
-      setShowVocabDrawer(true);
-    } catch (e) {
-      console.error('Failed bulk preload:', e);
     } finally {
       setIsBulkLoading(false);
       setBulkProgress(null);
@@ -290,15 +273,46 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
   };
 
   const handleRestart = () => {
-    setCurrentIndex(0);
-    setSelectedChoice(null);
-    setIsAnswerSubmitted(false);
-    setShowExplanation(false);
-    setScore(0);
-    setStreak(0);
+    if (analogySet) startSet(analogySet);
   };
 
   const categoryStyle = currentQ ? CATEGORY_COLORS[currentQ.category] || DEFAULT_COLOR : DEFAULT_COLOR;
+
+  const cachedConfirm = (
+    <ConfirmDialog
+      isOpen={pendingCached !== null}
+      theme="analogy"
+      title="Load your saved set?"
+      message={
+        pendingCached && (
+          <>
+            Opens your saved {pendingCached.intensity} set of {pendingCached.questions.length} analogies. Your current
+            score resets, and it doesn't use any API credits.
+          </>
+        )
+      }
+      confirmLabel="Load saved set"
+      onCancel={() => setPendingCached(null)}
+      onConfirm={() => {
+        if (pendingCached) startSet(pendingCached);
+        setPendingCached(null);
+      }}
+    />
+  );
+
+  if (isLoading) {
+    return (
+      <div className="card-glass p-8 sm:p-12 max-w-xl mx-auto rounded-3xl">
+        <GenerationProgress
+          theme="analogy"
+          title={`Building a ${selectedIntensity} analogy set`}
+          steps={['Choosing word relationships', 'Writing stem pairs', 'Writing answer choices and traps', 'Writing explanations']}
+          expectedSeconds={15}
+          onCancel={cancelGeneration}
+        />
+      </div>
+    );
+  }
 
   // Ensure currentQ is valid, otherwise show empty start screen
   if (!analogySet || !currentQ || !Array.isArray(currentQ.choices) || currentQ.choices.length < 2) {
@@ -311,7 +325,7 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
           Analogies
         </h2>
         <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mb-8 max-w-md mx-auto">
-          Drill relational vocabulary reasoning across subtle intensity differences, functional relationships, and characteristic actions.
+          GRE-style analogies: state the relationship in the stem pair as a general sentence, then find the one answer pair that fits it exactly.
         </p>
 
         {/* Intensity Mode Selector - Locked while loading */}
@@ -348,12 +362,8 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
           <button
             onClick={() => {
               const cached = getCachedAnalogies(selectedIntensity);
-              if (cached && Array.isArray(cached.questions) && cached.questions.length > 0 && cached.questions[0]?.pair) {
-                setAnalogySet(cached);
-                setCurrentIndex(0);
-                setSelectedChoice(null);
-                setIsAnswerSubmitted(false);
-                setShowExplanation(false);
+              if (cached) {
+                setPendingCached(cached);
                 setError(null);
               } else {
                 setError(`No cached test found for ${selectedIntensity} mode yet. Generate a new set first!`);
@@ -376,6 +386,11 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
                 <RefreshCw className="h-4 w-4 animate-spin" />
                 <span>Synthesizing {selectedIntensity} Set...</span>
               </>
+            ) : !hasKey ? (
+              <>
+                <KeyRound className="h-4 w-4" />
+                <span>Add API key to generate</span>
+              </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
@@ -384,6 +399,9 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
             )}
           </button>
         </div>
+
+        <KeyStatusPanel theme="analogy" onOpenApiKeyModal={onOpenApiKeyModal} stacked className="mt-8" />
+        {cachedConfirm}
       </div>
     );
   }
@@ -429,13 +447,8 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
           <button
             onClick={() => {
               const cached = getCachedAnalogies(selectedIntensity);
-              if (cached && cached.questions.length > 0) {
-                setAnalogySet(cached);
-                setCurrentIndex(0);
-                setSelectedChoice(null);
-                setIsAnswerSubmitted(false);
-                setShowExplanation(false);
-              }
+              if (cached) setPendingCached(cached);
+              else setError(`No cached test found for ${selectedIntensity} mode yet.`);
             }}
             className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-semibold tracking-wide transition-all"
           >
@@ -446,10 +459,11 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
             disabled={isLoading}
             className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-xs font-semibold tracking-wide shadow-md shadow-violet-500/25 hover:shadow-violet-500/40 transition-all disabled:opacity-50"
           >
-            {isLoading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-            {isLoading ? 'Synthesizing...' : 'Generate New'}
+            {isLoading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : hasKey ? <Sparkles className="h-3.5 w-3.5" /> : <KeyRound className="h-3.5 w-3.5" />}
+            {isLoading ? 'Synthesizing...' : hasKey ? 'Generate New' : 'Add API Key'}
           </button>
         </div>
+        {cachedConfirm}
       </div>
     );
   }
@@ -476,7 +490,7 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
               animate={{ opacity: 1, scale: 1 }}
               className={`text-[10px] font-mono tracking-wider uppercase font-semibold px-2.5 py-0.5 rounded-full border ${categoryStyle.bg} ${categoryStyle.border} ${categoryStyle.text}`}
             >
-              {currentQ.category.replace('_', ' ')}
+              {categoryLabel(currentQ.category)}
             </motion.span>
           )}
         </div>
@@ -487,37 +501,25 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
             <span className="font-mono">{streak} Streak</span>
           </div>
 
-          {/* Question-Level Quick Define / Bulk Load Button */}
+          {/* Question-Level Define Button */}
           <button
             onClick={handleBulkPreloadQuestion}
             disabled={isBulkLoading}
             className="text-xs text-rose-700 dark:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all font-semibold active:scale-95 disabled:opacity-50"
             title="Load definitions only for current question to conserve API credits"
           >
-            <BookA className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
-            <span className="hidden sm:inline">Define Question</span>
-            <span className="sm:hidden">Q-Dict</span>
-          </button>
-
-          {/* Mass Load All Dictionary / Vocabulary Index Button */}
-          <button
-            onClick={handleBulkPreload}
-            disabled={isBulkLoading}
-            className="text-xs text-violet-700 dark:text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/30 flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all font-semibold active:scale-95 disabled:opacity-50"
-            title="Mass-load all definitions for this set into memory and open dictionary view"
-          >
             {isBulkLoading ? (
               <>
-                <RefreshCw className="h-3 w-3 animate-spin text-violet-500" />
+                <RefreshCw className="h-3 w-3 animate-spin text-rose-500" />
                 <span className="font-mono text-[11px]">
                   {bulkProgress ? `${bulkProgress.loaded}/${bulkProgress.total}` : 'Loading...'}
                 </span>
               </>
             ) : (
               <>
-                <Library className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
-                <span className="hidden sm:inline">Mass Load Dict</span>
-                <span className="sm:hidden">All Dict</span>
+                <BookA className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+                <span className="hidden sm:inline">Define Question</span>
+                <span className="sm:hidden">Q-Dict</span>
               </>
             )}
           </button>
@@ -595,7 +597,7 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 font-mono tracking-wider">is to ... as</p>
         </div>
 
-        {/* 4 Choices */}
+        {/* Answer Choices */}
         <div className="grid grid-cols-1 gap-3 mb-7">
           {currentQ?.choices.map((choice, idx) => {
             const isSelected = selectedChoice === idx;
@@ -714,11 +716,22 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
               exit={{ opacity: 0, height: 0 }}
               className="mt-6 pt-6 border-t border-zinc-200 dark:border-white/[0.08] space-y-3"
             >
+              {currentQ.generalSentence && (
+                <div className="p-5 rounded-2xl bg-zinc-50 dark:bg-white/[0.02] border border-zinc-200 dark:border-white/[0.06]">
+                  <span className="font-mono text-[10px] uppercase font-semibold text-zinc-500 dark:text-zinc-400 tracking-wider block mb-1.5">
+                    General Sentence
+                  </span>
+                  <p className="font-serif text-sm text-zinc-900 dark:text-zinc-100 leading-relaxed">
+                    {currentQ.generalSentence}
+                  </p>
+                </div>
+              )}
+
               <div className="p-5 rounded-2xl bg-violet-500/[0.08] border border-violet-500/20">
                 <div className="flex items-center gap-2 text-violet-700 dark:text-violet-300 text-xs font-semibold mb-2">
                   <Lightbulb className="h-4 w-4" />
                   <span className="font-mono tracking-wider uppercase text-[10px]">
-                    Logical Bridge ({currentQ.category.replace('_', ' ')})
+                    Logical Bridge ({categoryLabel(currentQ.category)})
                   </span>
                 </div>
                 <p className="font-serif italic text-sm text-zinc-900 dark:text-violet-100 leading-relaxed">
@@ -795,7 +808,7 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
         </div>
       )}
 
-      {/* Mass Vocabulary / Dictionary Overview Drawer Modal */}
+      {/* Vocabulary / Dictionary Drawer Modal */}
       {showVocabDrawer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/70 backdrop-blur-md">
           <motion.div
@@ -828,7 +841,7 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal }) =
             <div className="flex-1 overflow-y-auto py-4 space-y-3 pr-1 scrollbar-thin">
               {Object.keys(bulkDefinitions).length === 0 ? (
                 <div className="text-center py-10 text-zinc-400 text-xs font-mono">
-                  No vocabulary loaded yet. Click "Mass Load Dict" to pre-load all words.
+                  No vocabulary loaded yet. Click "Define Question" to load this question's words.
                 </div>
               ) : (
                 Object.entries(bulkDefinitions).map(([wordKey, def]) => (

@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft,
   ChevronRight,
@@ -28,33 +27,9 @@ interface RhetoricalFlashcardsProps {
   flashcards: RhetoricalFlashcardItem[];
 }
 
-const cardVariants = {
-  enter: (direction: number) => ({
-    x: direction > 0 ? 120 : -120,
-    opacity: 0,
-    rotateY: direction > 0 ? 15 : -15,
-    scale: 0.95,
-  }),
-  center: {
-    zIndex: 1,
-    x: 0,
-    opacity: 1,
-    rotateY: 0,
-    scale: 1,
-  },
-  exit: (direction: number) => ({
-    zIndex: 0,
-    x: direction < 0 ? 120 : -120,
-    opacity: 0,
-    rotateY: direction < 0 ? 15 : -15,
-    scale: 0.95,
-  }),
-};
-
 export function RhetoricalFlashcards({ flashcards }: RhetoricalFlashcardsProps) {
   const [index, setIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [direction, setDirection] = useState(0);
   const [shuffledCards, setShuffledCards] = useState<RhetoricalFlashcardItem[]>(flashcards);
   const [isShuffled, setIsShuffled] = useState(false);
   const [confidenceRatings, setConfidenceRatings] = useState<Record<string, ConfidenceLevel>>({});
@@ -101,14 +76,12 @@ export function RhetoricalFlashcards({ flashcards }: RhetoricalFlashcardsProps) 
 
   const goNext = useCallback(() => {
     if (!filteredCards.length) return;
-    setDirection(1);
     setIsFlipped(false);
     setIndex((prev) => (prev + 1) % filteredCards.length);
   }, [filteredCards.length]);
 
   const goPrev = useCallback(() => {
     if (!filteredCards.length) return;
-    setDirection(-1);
     setIsFlipped(false);
     setIndex((prev) => (prev - 1 + filteredCards.length) % filteredCards.length);
   }, [filteredCards.length]);
@@ -244,18 +217,10 @@ export function RhetoricalFlashcards({ flashcards }: RhetoricalFlashcardsProps) 
         </div>
       </div>
 
-      {/* 3D Flip Card Container */}
-      <div className="relative min-h-[420px] cursor-pointer perspective-1000" onClick={toggleFlip}>
-        <AnimatePresence custom={direction} mode="wait">
-          <motion.div
-            key={currentCard?.term + (isFlipped ? '-back' : '-front')}
-            custom={direction}
-            variants={cardVariants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-            className={`w-full min-h-[420px] rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-2xl transition-all border ${
+      {/* Flip Card: switches instantly, no flip/slide animation */}
+      <div className="relative min-h-[420px] cursor-pointer select-none" onClick={toggleFlip}>
+          <div
+            className={`w-full min-h-[420px] rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-2xl transition-colors border ${
               isFlipped
                 ? 'bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border-emerald-500/40 shadow-emerald-500/10'
                 : 'bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 border-emerald-500/20 hover:border-emerald-500/40'
@@ -399,8 +364,7 @@ export function RhetoricalFlashcards({ flashcards }: RhetoricalFlashcardsProps) 
                 </button>
               </div>
             </div>
-          </motion.div>
-        </AnimatePresence>
+          </div>
       </div>
 
       {/* Navigation Buttons */}

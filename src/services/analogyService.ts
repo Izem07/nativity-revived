@@ -1,4 +1,4 @@
-import { globalKeyPool } from './keyPoolService';
+import { globalKeyPool, speedConfig } from './keyPoolService';
 
 // ==========================================
 // ANALOGY QUIZ — AP Lang Analogy Engine
@@ -6,12 +6,52 @@ import { globalKeyPool } from './keyPoolService';
 
 export type AnalogyIntensity = 'Easy' | 'Standard' | 'Challenging' | 'Advanced';
 
+export type AnalogyCategory =
+  | 'DEFINITION'
+  | 'SYNONYM'
+  | 'ANTONYM'
+  | 'TYPE_KIND'
+  | 'DEGREE'
+  | 'FUNCTION'
+  | 'PART_WHOLE'
+  | 'CAUSE_EFFECT';
+
+export const ANALOGY_CATEGORIES: AnalogyCategory[] = [
+  'DEFINITION',
+  'SYNONYM',
+  'ANTONYM',
+  'TYPE_KIND',
+  'DEGREE',
+  'FUNCTION',
+  'PART_WHOLE',
+  'CAUSE_EFFECT'
+];
+
+export const CATEGORY_LABELS: Record<string, string> = {
+  DEFINITION: 'Definition / Evidence',
+  SYNONYM: 'Synonym',
+  ANTONYM: 'Antonym',
+  TYPE_KIND: 'Type / Kind',
+  DEGREE: 'Degree / Intensity',
+  FUNCTION: 'Purpose / Function',
+  PART_WHOLE: 'Component / Part',
+  CAUSE_EFFECT: 'Cause & Effect',
+  // Legacy categories from older cached sets
+  CHARACTERISTIC: 'Characteristic',
+  SYNONYM_INTENSITY: 'Synonym Intensity'
+};
+
+export const ANALOGY_CHOICE_COUNT = 5;
+
 export interface AnalogyQuestion {
   pair: [string, string];
   choices: [string, string][];
   correctIndex: number;
+  // General sentence with blanks that expresses the stem relationship, e.g.
+  // "A ____ does something as one part of a ____ as a whole." Absent on older cached sets.
+  generalSentence?: string;
   bridge: string;
-  category: 'DEGREE' | 'FUNCTION' | 'CAUSE_EFFECT' | 'CHARACTERISTIC' | 'PART_WHOLE' | 'SYNONYM_INTENSITY';
+  category: AnalogyCategory | string;
   rationale: string;
 }
 
@@ -335,32 +375,20 @@ Return ONLY a JSON array of objects with schema:
 const CACHE_KEY_PREFIX = 'NATIVITY_ANALOGY_CACHE_';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
-export function getCachedAnalogies(intensity?: AnalogyIntensity): AnalogySet | null {
+// Returns the saved set for exactly this difficulty, or null. Never substitutes a set from another difficulty.
+export function getCachedAnalogies(intensity: AnalogyIntensity): AnalogySet | null {
   try {
-    // 1. Try specified intensity first
-    if (intensity) {
-      const raw = localStorage.getItem(`${CACHE_KEY_PREFIX}${intensity}`);
-      if (raw) {
-        const parsed: AnalogySet = JSON.parse(raw);
-        if (isValidAnalogySet(parsed)) return parsed;
-      }
+    const raw = localStorage.getItem(`${CACHE_KEY_PREFIX}${intensity}`);
+    if (raw) {
+      const parsed: AnalogySet = JSON.parse(raw);
+      if (isValidAnalogySet(parsed)) return parsed;
     }
 
-    // 2. Fallback: check any stored intensity in order
-    const allIntensities: AnalogyIntensity[] = ['Standard', 'Easy', 'Challenging', 'Advanced'];
-    for (const lvl of allIntensities) {
-      const raw = localStorage.getItem(`${CACHE_KEY_PREFIX}${lvl}`);
-      if (raw) {
-        const parsed: AnalogySet = JSON.parse(raw);
-        if (isValidAnalogySet(parsed)) return parsed;
-      }
-    }
-
-    // 3. Fallback: check legacy key
+    // Legacy single-slot key, only if it was saved at this difficulty
     const legacy = localStorage.getItem('NATIVITY_ANALOGY_CACHE');
     if (legacy) {
       const parsed: AnalogySet = JSON.parse(legacy);
-      if (isValidAnalogySet(parsed)) return parsed;
+      if (parsed?.intensity === intensity && isValidAnalogySet(parsed)) return parsed;
     }
 
     return null;
@@ -392,30 +420,45 @@ export function setCachedAnalogies(set: AnalogySet): void {
   } catch {}
 }
 
-const BASE_PROMPT = `You are an expert analogy question author for advanced AP English Language students.
-Generate analogy questions that test nuanced relationships between words.
+const BASE_PROMPT = `You are an expert author of GRE-style verbal analogy questions for advanced AP English Language students.
+An analogy compares two things that seem unrelated but are related in some respect. Each question tests whether the student can
+recognize the relationship in a stem pair and identify the answer pair with the parallel relationship.
 
-CATEGORY TYPES to distribute:
-- DEGREE: words that differ in degree/intensity (lukewarm : scalding, displeased : livid, damp : saturated)
-- FUNCTION: an item to its primary instrument/user/purpose (scalpel : surgeon, rudder : vessel, chisel : sculptor)
-- CAUSE_EFFECT: action to natural consequence (practice : mastery, negligence : decay, catalyst : reaction)
-- CHARACTERISTIC: a quintessential trait of something (stoic : composure, prodigal : extravagance, zephyr : gentle)
-- PART_WHOLE: component to containing system (stanza : poem, vertebra : spine, rung : ladder)
-- SYNONYM_INTENSITY: subtle gradations of meaning where one is dramatically more potent
+METHOD — ESTABLISH THE RELATIONSHIP WITH A GENERAL SENTENCE:
+For every question, write a "general sentence" that states the stem relationship precisely, with blanks in place of the words.
+Be specific: "A musician plays in an orchestra" is too loose; "A ____ does something as one part of a ____ as a whole" is precise.
+Exactly one answer pair must fit the general sentence. Each distractor should fit a loose version of the sentence at most, never the precise one.
+Example — MUSICIAN : ORCHESTRA :: (A) mechanic : car (B) songwriter : lyrics (C) desk : office (D) player : team (E) actor : screen
+General sentence: "A ____ does something as one part of a ____ as a whole." Correct: player : team.
+
+RELATIONSHIP TYPES — spread questions across these categories:
+- DEFINITION: one word defines the other, or is a defining characteristic of it (paragon : excellence)
+- SYNONYM: the words have similar meanings (fascination : interest)
+- ANTONYM: the words have opposite meanings (stingy : generous)
+- TYPE_KIND: one word is a type or example of the other (French : language)
+- DEGREE: same concept, different intensity, size or extent (phobia : fear)
+- FUNCTION: one word is the purpose or function of the other (needle : stitch)
+- PART_WHOLE: one word is a member, part or component of the other (actor : cast, flour : bread)
+- CAUSE_EFFECT: one word leads to or results in the other (preparation : success)
 
 RULES:
-1. "pair" MUST be an array of two complete English words as strings, e.g. ["displeased", "livid"]. NEVER output single letters, abbreviations, or empty strings!
-2. "choices" MUST be an array of 4 option pairs. Each option pair MUST be an array of two complete English words, e.g. [["lukewarm", "boiling"], ["damp", "saturated"], ["chilly", "freezing"], ["annoyed", "enraged"]]. NEVER return single letters!
-3. Distractor options MUST be plausible word pairs with distinct logical relationships, not random words.
-4. The correct answer must strictly match the relationship syntax and direction of the stem pair.
-5. Bridge sentence MUST follow the pattern: "[Word A] is to [Word B] as [Choice A] is to [Choice B] because..."
-6. Randomize the correct index (0, 1, 2, or 3).
-7. Output ONLY a valid JSON array of objects with fields:
+1. "pair" MUST be an array of two complete English words, e.g. ["phobia", "fear"]. NEVER output single letters, abbreviations, or empty strings.
+2. "choices" MUST be an array of exactly ${ANALOGY_CHOICE_COUNT} option pairs, each an array of two complete English words.
+3. Choices must keep the same order and direction as the stem (if the stem is PART : WHOLE, the answer is PART : WHOLE, not WHOLE : PART).
+4. Distractors must be plausible pairs with clear but different relationships: a reversed direction, a related but different category,
+   or a loose association (like actor : screen). No random words.
+5. "generalSentence" is the blank-filled sentence described above, using "____" for each word.
+6. "bridge" applies the general sentence to both the stem and the correct answer, e.g.
+   "A musician performs as one part of an orchestra as a whole, just as a player participates as one part of a team as a whole."
+7. "rationale" explains briefly why each distractor fails the general sentence.
+8. Randomize "correctIndex" (0 to ${ANALOGY_CHOICE_COUNT - 1}).
+9. Output ONLY a valid JSON array of objects with fields:
    - "pair": [string, string]
-   - "choices": [[string, string], [string, string], [string, string], [string, string]]
-   - "correctIndex": number (0 to 3)
+   - "choices": [[string, string] x ${ANALOGY_CHOICE_COUNT}]
+   - "correctIndex": number
+   - "generalSentence": string
    - "bridge": string
-   - "category": "DEGREE" | "FUNCTION" | "CAUSE_EFFECT" | "CHARACTERISTIC" | "PART_WHOLE" | "SYNONYM_INTENSITY"
+   - "category": ${ANALOGY_CATEGORIES.map((c) => `"${c}"`).join(' | ')}
    - "rationale": string`;
 
 export async function generateAnalogies(
@@ -429,18 +472,22 @@ export async function generateAnalogies(
     'Advanced': 'Use advanced AP Lang vocabulary testing subtle gradations of intensity, secondary word definitions, and nuanced syntactic parallels.'
   }[intensity];
 
-  const questions = await globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
+  const questions = await globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
+    const modelName = fallbackModel || 'gemini-3.8-flash';
     const model = genAI.getGenerativeModel({
-      model: fallbackModel || 'gemini-3.8-flash',
+      model: modelName,
+      // JSON mode avoids malformed replies (which force a full retry); lower thinking answers sooner
       generationConfig: {
         temperature: 0.85,
         topP: 0.95,
+        responseMimeType: 'application/json',
+        ...speedConfig(modelName),
       },
     });
 
     const fullPrompt = `${BASE_PROMPT}\n\nDifficulty Intensity: ${intensity}. ${intensityInstructions}\nTask: Generate ${count} analogy questions. Return ONLY a valid JSON array matching the schema above.`;
 
-    const result = await model.generateContent(fullPrompt);
+    const result = await model.generateContent(fullPrompt, { signal });
     const raw = result.response.text().trim();
     const cleaned = raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
     const jsonStr = cleaned.startsWith('[') ? cleaned : '[' + cleaned;
@@ -457,14 +504,25 @@ export async function generateAnalogies(
     };
 
     const sanitize = (arr: any[]): AnalogyQuestion[] => {
-      return arr.map((item) => ({
-        pair: parsePair(item.pair),
-        choices: (item.choices || []).map((c: any) => parsePair(c)),
-        correctIndex: typeof item.correctIndex === 'number' ? item.correctIndex : 0,
-        bridge: String(item.bridge || ''),
-        category: item.category || 'DEGREE',
-        rationale: String(item.rationale || '')
-      }));
+      return arr
+        .map((item) => ({
+          pair: parsePair(item.pair),
+          choices: (item.choices || []).map((c: any) => parsePair(c)),
+          correctIndex: typeof item.correctIndex === 'number' ? item.correctIndex : 0,
+          generalSentence: String(item.generalSentence || ''),
+          bridge: String(item.bridge || ''),
+          category: ANALOGY_CATEGORIES.includes(item.category) ? item.category : 'DEFINITION',
+          rationale: String(item.rationale || '')
+        }))
+        // Drop malformed questions rather than showing an unanswerable one
+        .filter(
+          (q: AnalogyQuestion) =>
+            q.pair[0] &&
+            q.pair[1] &&
+            q.choices.length >= 2 &&
+            q.correctIndex >= 0 &&
+            q.correctIndex < q.choices.length
+        );
     };
 
     try {
@@ -479,6 +537,10 @@ export async function generateAnalogies(
       throw new Error('Analogy generator returned malformed JSON. Please try again.');
     }
   });
+
+  if (questions.length === 0) {
+    throw new Error('Analogy generator returned no usable questions. Please try again.');
+  }
 
   const set: AnalogySet = { questions, generatedAt: Date.now(), intensity };
   setCachedAnalogies(set);

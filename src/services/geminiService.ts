@@ -3,7 +3,7 @@ import { FlashcardItem } from '../components/Flashcards';
 import { MatchingPair } from '../components/Matching';
 import { ParagraphData } from '../components/ParagraphPractice';
 import { QuizQuestion } from '../components/Quiz';
-import { globalKeyPool } from './keyPoolService';
+import { globalKeyPool, speedConfig } from './keyPoolService';
 
 export const getStoredAPIKey = (): string => {
   const storedKey = localStorage.getItem('GEMINI_API_KEY');
@@ -49,8 +49,13 @@ const extractAndParseJson = (text: string) => {
 };
 
 export const generateQuizContent = async (vocabularyList: string[]): Promise<QuizGenerationResult> => {
-  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
-    const model = genAI.getGenerativeModel({ model: fallbackModel || 'gemini-3.8-flash' });
+  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
+    const modelName = fallbackModel || 'gemini-3.8-flash';
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      // JSON mode avoids malformed replies (which force a full retry); lower thinking answers sooner
+      generationConfig: { responseMimeType: 'application/json', ...speedConfig(modelName) }
+    });
     const vocabString = vocabularyList.join(', ');
 
     // Generate Quiz Questions
@@ -134,10 +139,10 @@ export const generateQuizContent = async (vocabularyList: string[]): Promise<Qui
     }`;
 
     const [quizResult, flashcardResult, matchingResult, paragraphResult] = await Promise.all([
-      model.generateContent(quizPrompt),
-      model.generateContent(flashcardPrompt),
-      model.generateContent(matchingPrompt),
-      model.generateContent(paragraphPrompt)
+      model.generateContent(quizPrompt, { signal }),
+      model.generateContent(flashcardPrompt, { signal }),
+      model.generateContent(matchingPrompt, { signal }),
+      model.generateContent(paragraphPrompt, { signal })
     ]);
 
     const quizData = extractAndParseJson(quizResult.response.text());
@@ -154,39 +159,43 @@ export const generateQuizContent = async (vocabularyList: string[]): Promise<Qui
   });
 };
 
+// Checks a key by listing models instead of generating content: no quota used, no model load
+// to wait on, and it answers in well under a second.
+const KEY_TEST_TIMEOUT_MS = 8000;
+
 export const testAPIKey = async (candidateKey?: string): Promise<{ valid: boolean; error?: string }> => {
+  const key = candidateKey ? candidateKey.trim() : getStoredAPIKey();
+  if (!key) return { valid: false, error: "No API key provided" };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), KEY_TEST_TIMEOUT_MS);
+
   try {
-    const key = candidateKey ? candidateKey.trim() : getStoredAPIKey();
-    if (!key) return { valid: false, error: "No API key provided" };
-    const genAI = new GoogleGenerativeAI(key);
-    const testModels = [
-      "gemini-3.8-flash",
-      "gemini-3.6-flash",
-      "gemini-3.5-flash-lite",
-      "gemini-3.1-flash-lite"
-    ];
-    let lastErr = "";
-    for (const modelName of testModels) {
-      try {
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent("ping");
-        if (result?.response?.text()) {
-          return { valid: true };
-        }
-      } catch (e: any) {
-        lastErr = e?.message || String(e);
-        if (lastErr.includes("404") || lastErr.includes("not found") || lastErr.includes("no longer available")) {
-          continue;
-        }
-        if (lastErr.includes("429") || lastErr.includes("Quota exceeded") || lastErr.includes("RESOURCE_EXHAUSTED")) {
-          return { valid: true };
-        }
-        break;
-      }
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?pageSize=1&key=${encodeURIComponent(key)}`,
+      { signal: controller.signal }
+    );
+    if (res.ok) return { valid: true };
+
+    // Rate-limited means the key itself is real
+    if (res.status === 429) return { valid: true };
+
+    const body = await res.json().catch(() => null);
+    const reason: string = body?.error?.details?.find((d: any) => d?.reason)?.reason || '';
+    if (reason === 'API_KEY_INVALID' || res.status === 400) {
+      return { valid: false, error: "That key isn't valid. Copy it again from Google AI Studio." };
     }
-    return { valid: false, error: lastErr || "Invalid API Key" };
+    if (res.status === 403) {
+      return { valid: false, error: "This key doesn't have access to the Gemini API. Create one in Google AI Studio." };
+    }
+    return { valid: false, error: body?.error?.message || `Verification failed (HTTP ${res.status}).` };
   } catch (err: any) {
-    return { valid: false, error: err?.message || "Invalid API Key" };
+    if (err?.name === 'AbortError') {
+      return { valid: false, error: "Google didn't respond in time. Check your connection and try again." };
+    }
+    return { valid: false, error: "Couldn't reach Google. Check your connection and try again." };
+  } finally {
+    clearTimeout(timeoutId);
   }
 };
 
@@ -403,8 +412,13 @@ export interface RhetoricalGenerationResult {
 }
 
 export const generateRhetoricalContent = async (termsList: string[]): Promise<RhetoricalGenerationResult> => {
-  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
-    const model = genAI.getGenerativeModel({ model: fallbackModel || 'gemini-3.8-flash' });
+  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
+    const modelName = fallbackModel || 'gemini-3.8-flash';
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      // JSON mode avoids malformed replies (which force a full retry); lower thinking answers sooner
+      generationConfig: { responseMimeType: 'application/json', ...speedConfig(modelName) }
+    });
     const termsString = termsList.join(', ');
 
     // 1. Rhetorical Flashcards
@@ -504,10 +518,10 @@ export const generateRhetoricalContent = async (termsList: string[]): Promise<Rh
     }`;
 
     const [flashcardResult, sentenceMatchResult, quizResult, passageResult] = await Promise.all([
-      model.generateContent(flashcardPrompt),
-      model.generateContent(sentenceMatchPrompt),
-      model.generateContent(quizPrompt),
-      model.generateContent(passagePrompt)
+      model.generateContent(flashcardPrompt, { signal }),
+      model.generateContent(sentenceMatchPrompt, { signal }),
+      model.generateContent(quizPrompt, { signal }),
+      model.generateContent(passagePrompt, { signal })
     ]);
 
     const flashcardData = extractAndParseJson(flashcardResult.response.text());

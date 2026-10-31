@@ -39,6 +39,20 @@ export default {
         card: 'var(--shadow-card)',
         'card-hover': 'var(--shadow-card-hover)',
       },
+      keyframes: {
+        'fade-in': {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+        'modal-in': {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'fade-in': 'fade-in 160ms ease-out both',
+        'modal-in': 'modal-in 160ms cubic-bezier(0.16, 1, 0.3, 1) both',
+      },
       backgroundImage: {
         /* neutral tiny dots — visible on both dark (white dots) and light (dark dots) */
         'noise': "radial-gradient(rgba(100, 116, 139, 0.06) 1px, transparent 0)",

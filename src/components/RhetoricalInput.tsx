@@ -16,6 +16,10 @@ import {
 } from 'lucide-react';
 import { generateRhetoricalContent, RhetoricalGenerationResult, getStoredAPIKey } from '../services/geminiService';
 import { getCachedRhetoricalResult, setCachedRhetoricalResult } from '../services/cacheService';
+import { KeyStatusPanel } from './KeyStatusPanel';
+import { useHasApiKey } from '../hooks/useHasApiKey';
+import { ConfirmDialog } from './ConfirmDialog';
+import { beginGeneration, endGeneration, isCancelledError } from '../services/generationControl';
 import { RHETORICAL_COURSE_UNITS, RhetoricalCourseUnit } from '../data/rhetoricalCourseData';
 
 interface RhetoricalInputProps {
@@ -25,6 +29,9 @@ interface RhetoricalInputProps {
 }
 
 export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: RhetoricalInputProps) {
+  const hasKey = useHasApiKey();
+  // Saved set waiting for the user to confirm loading it
+  const [pendingCached, setPendingCached] = useState<ReturnType<typeof getCachedRhetoricalResult>>(null);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [termsList, setTermsList] = useState<string[]>(['']);
   const [showCourseNotes, setShowCourseNotes] = useState(false);
@@ -97,9 +104,8 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
     const normalized = termsList.map((t) => t.trim()).filter(Boolean);
     const cached = getCachedRhetoricalResult(normalized.length >= 2 ? normalized : undefined);
     if (cached) {
-      onGenerate(cached.data, cached.terms);
-      onLoadingChange(false);
       setError(null);
+      setPendingCached(cached);
     } else {
       setError('No cached rhetorical study packet found in local storage. Generate one first!');
     }
@@ -135,11 +141,18 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
     setIsGenerating(true);
     onLoadingChange(true);
 
+    const signal = beginGeneration();
     try {
       const result = await generateRhetoricalContent(normalized);
+      if (signal.aborted) return;
       setCachedRhetoricalResult(normalized, result);
       onGenerate(result, normalized);
     } catch (generateError) {
+      if (signal.aborted || isCancelledError(generateError)) {
+        // Cancelled by the user: back to the setup screen quietly
+        onLoadingChange(false);
+        return;
+      }
       setError(
         generateError instanceof Error
           ? generateError.message
@@ -147,6 +160,7 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
       );
       onLoadingChange(false);
     } finally {
+      endGeneration(signal);
       setIsGenerating(false);
     }
   };
@@ -308,12 +322,12 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
             </button>
 
             <button
-              onClick={handleGenerateClick}
-              disabled={isGenerating || filledCount < 2}
+              onClick={hasKey ? handleGenerateClick : onOpenApiKeyModal}
+              disabled={hasKey && (isGenerating || filledCount < 2)}
               className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white font-semibold text-xs tracking-wide uppercase shadow-md shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40"
             >
-              <Sparkles className="h-4 w-4" />
-              <span>{isGenerating ? 'Synthesizing...' : 'Generate Sentence Game & Quiz'}</span>
+              {hasKey ? <Sparkles className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}
+              <span>{!hasKey ? 'Add API key to generate' : isGenerating ? 'Synthesizing...' : 'Generate Sentence Game & Quiz'}</span>
             </button>
           </div>
         </div>
@@ -327,7 +341,36 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
             </button>
           </div>
         )}
+
+        <KeyStatusPanel theme="rhetoric" onOpenApiKeyModal={onOpenApiKeyModal} className="mt-8" />
       </div>
+
+      <ConfirmDialog
+        isOpen={pendingCached !== null}
+        theme="rhetoric"
+        title="Load your saved rhetoric packet?"
+        message={
+          pendingCached && (
+            <>
+              Opens the rhetoric packet you saved for {pendingCached.terms.length} terms:{' '}
+              <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                {pendingCached.terms.slice(0, 5).join(', ')}
+                {pendingCached.terms.length > 5 ? ', …' : ''}
+              </span>
+              . It loads instantly and doesn't use any API credits.
+            </>
+          )
+        }
+        confirmLabel="Load saved rhetoric packet"
+        onCancel={() => setPendingCached(null)}
+        onConfirm={() => {
+          if (pendingCached) {
+            onGenerate(pendingCached.data, pendingCached.terms);
+            onLoadingChange(false);
+          }
+          setPendingCached(null);
+        }}
+      />
 
       {/* Confirmation Modal */}
       {confirmGenerateOpen && (
