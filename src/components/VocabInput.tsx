@@ -79,6 +79,7 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
   // Saved set waiting for the user to confirm loading it
   const [pendingCached, setPendingCached] = useState<ReturnType<typeof getCachedResult>>(null);
   const [vocabList, setVocabList] = useState<string[]>(['']);
+  const [difficulty, setDifficulty] = useState<'easy' | 'standard' | 'hard'>('standard');
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [cacheDialogOpen, setCacheDialogOpen] = useState(false);
@@ -196,7 +197,7 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
 
     const signal = beginGeneration();
     try {
-      const result = await generateQuizContent(normalized);
+      const result = await generateQuizContent(normalized, difficulty);
       if (signal.aborted) return;
       setCachedResult(normalized, result);
       onGenerate(result, normalized);
@@ -224,10 +225,10 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
       <div className="text-center space-y-3">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-brand-500/30 bg-brand-500/10 text-brand-600 dark:text-brand-300 text-xs font-semibold tracking-wide uppercase">
           <Sparkles className="h-3.5 w-3.5" />
-          <span>Academic Study Engine</span>
+          <span>Vocab Study Section</span>
         </div>
         <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Vocabulary Master Suite
+          Vocabulary Review
         </h2>
         <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 max-w-xl mx-auto leading-relaxed">
           Provide 3 to 50 target vocabulary words to generate contextual flashcards, multiple-choice quizzes, interactive games, and analytical synthesis passages.
@@ -371,14 +372,14 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleAddWord}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-zinc-100 dark:bg-white/[0.03] hover:bg-zinc-200 dark:hover:bg-white/[0.06] text-zinc-700 dark:text-zinc-300 text-xs font-semibold tracking-wide transition-all"
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-zinc-100 dark:bg-white/[0.03] hover:bg-zinc-200 dark:hover:bg-white/[0.06] text-zinc-700 dark:text-zinc-300 text-xs font-semibold tracking-wide transition-all cursor-pointer"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   <span>Add Word</span>
                 </button>
                 <button
                   onClick={handleCheckCache}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-semibold tracking-wide transition-all"
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-semibold tracking-wide transition-all cursor-pointer"
                   title="Load any previously stored vocabulary study set without using API credits"
                 >
                   <Database className="h-3.5 w-3.5" />
@@ -386,10 +387,29 @@ export function VocabInput({ onGenerate, onLoadingChange, onOpenApiKeyModal }: V
                 </button>
               </div>
 
+              {/* Difficulty Mode Selector */}
+              <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs">
+                <span className="text-[10px] font-semibold uppercase text-zinc-400 px-2 tracking-wider">Mode:</span>
+                {(['easy', 'standard', 'hard'] as const).map((diff) => (
+                  <button
+                    key={diff}
+                    type="button"
+                    onClick={() => setDifficulty(diff)}
+                    className={`px-2.5 py-1 rounded-lg font-semibold capitalize transition-all cursor-pointer ${
+                      difficulty === diff
+                        ? 'bg-brand-600 text-white shadow-sm'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {diff === 'standard' ? 'Standard' : diff}
+                  </button>
+                ))}
+              </div>
+
               <button
                 onClick={hasKey ? handleGenerateClick : onOpenApiKeyModal}
                 disabled={hasKey && (isGenerating || filledCount < 3)}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 via-indigo-600 to-sky-600 text-white font-semibold text-xs tracking-wide uppercase shadow-md shadow-brand-500/25 hover:shadow-brand-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40"
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 via-indigo-600 to-sky-600 text-white font-semibold text-xs tracking-wide uppercase shadow-md shadow-brand-500/25 hover:shadow-brand-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 cursor-pointer"
               >
                 {hasKey ? <Sparkles className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}
                 <span>{!hasKey ? 'Add API key to generate' : isGenerating ? 'Synthesizing...' : 'Generate Study Materials'}</span>

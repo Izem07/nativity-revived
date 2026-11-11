@@ -325,7 +325,7 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal, onG
           Analogies
         </h2>
         <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mb-8 max-w-md mx-auto">
-          GRE-style analogies: state the relationship in the stem pair as a general sentence, then find the one answer pair that fits it exactly.
+          Test your ability to pinpoint precise logical relationships between words rather than just matching simple definitions.
         </p>
 
         {/* Intensity Mode Selector - Locked while loading */}
@@ -408,8 +408,8 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal, onG
 
   // Set Complete Screen
   if (currentIndex >= analogySet.questions.length) {
-    const total = analogySet.questions.length;
-    const pct = Math.round((score / total) * 100);
+    const total = analogySet.questions.length || 1;
+    const pct = Math.min(100, Math.max(0, Math.round((score / total) * 100)));
 
     return (
       <div className="card-glass p-8 sm:p-12 text-center max-w-lg mx-auto rounded-3xl relative overflow-hidden transition-all">
@@ -425,7 +425,7 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal, onG
             <div className="font-serif text-3xl font-bold text-zinc-900 dark:text-white mt-1">
               {score} <span className="text-lg text-zinc-400 font-sans font-normal">/ {total}</span>
             </div>
-            <span className="text-[11px] text-violet-600 dark:text-violet-400 font-medium">{pct}% Accuracy</span>
+            <span className="text-[11px] text-violet-600 dark:text-violet-400 font-medium">{pct}% Accuracy (100 Scale)</span>
           </div>
           <div className="p-5 rounded-2xl bg-zinc-50 dark:bg-white/[0.03] border border-zinc-200 dark:border-white/[0.06]">
             <span className="text-[11px] font-mono tracking-wider uppercase text-zinc-500 dark:text-zinc-400">Best Streak</span>

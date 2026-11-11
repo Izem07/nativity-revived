@@ -50,10 +50,15 @@ const modelsRejectingThinking = new Set<string>();
 
 /**
  * Extra generationConfig for study-set generation. Lower thinking makes Flash models start
- * answering much sooner; if a model rejects the setting it's dropped automatically for that model.
+ * answering much sooner; temperature 0.2 provides high factual accuracy and adherence to schemas.
  */
 export function speedConfig(modelName: string): Record<string, unknown> {
-  return modelsRejectingThinking.has(modelName) ? {} : { thinkingConfig: { thinkingLevel: 'low' } };
+  const base: Record<string, unknown> = {
+    temperature: 0.2,
+  };
+  return modelsRejectingThinking.has(modelName)
+    ? base
+    : { ...base, thinkingConfig: { thinkingLevel: 'low' } };
 }
 
 // Fired on window whenever the saved key list changes, so UI can update without a reload
@@ -169,6 +174,15 @@ export class KeyPool {
     return this.getCurrentKey();
   }
 
+  /**
+   * Cooperatively advances to next key in pool so traffic is evenly load-balanced across all keys
+   */
+  public advanceNextKey(): void {
+    if (this.keys.length > 1) {
+      this.currentIndex = (this.currentIndex + 1) % this.keys.length;
+    }
+  }
+
   public getStatus(): KeyPoolStatus {
     this.refreshKeysFromStorage();
     const active = this.keys[this.currentIndex] || '';
@@ -249,7 +263,10 @@ export class KeyPool {
       const activeModelName = modelCandidates[modelIndex];
 
       try {
-        return await raceAbort(operation(genAI, activeKey, activeModelName, signal), signal);
+        const result = await raceAbort(operation(genAI, activeKey, activeModelName, signal), signal);
+        // Successful API call: advance to next key so traffic is evenly distributed across all keys in pool
+        this.advanceNextKey();
+        return result;
       } catch (err: any) {
         // A cancel is never retried or reported as a failure
         if (signal?.aborted) throw cancelledError();

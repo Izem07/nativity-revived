@@ -18,7 +18,7 @@ export const RHETORICAL_COURSE_UNITS: RhetoricalCourseUnit[] = [
   {
     id: 'unit-1',
     testNumber: 1,
-    unitTitle: 'Unit 1 (Test 1): Core Foundations',
+    unitTitle: 'Unit 1',
     description: 'Diction, syntax, denotation, and connotation fundamentals.',
     terms: ['Diction', 'Syntax', 'Denotation', 'Connotation'],
     termsDetailed: [
@@ -47,7 +47,7 @@ export const RHETORICAL_COURSE_UNITS: RhetoricalCourseUnit[] = [
   {
     id: 'unit-2',
     testNumber: 2,
-    unitTitle: 'Unit 2 (Test 2): Appeals & Sentence Architecture',
+    unitTitle: 'Unit 2',
     description: 'Rhetoric, Ethos, Logos, Pathos, and syntactic sentence structures.',
     terms: [
       'Rhetoric',
@@ -104,7 +104,7 @@ export const RHETORICAL_COURSE_UNITS: RhetoricalCourseUnit[] = [
   {
     id: 'unit-3',
     testNumber: 3,
-    unitTitle: 'Unit 3 (Test 3): Structural Framing & Inversion',
+    unitTitle: 'Unit 3',
     description: 'Parallelism, Inversion, Juxtaposition, and Parenthetical insertions.',
     terms: ['Parallelism', 'Inversion', 'Juxtaposition', 'Parenthetical'],
     termsDetailed: [
@@ -133,7 +133,7 @@ export const RHETORICAL_COURSE_UNITS: RhetoricalCourseUnit[] = [
   {
     id: 'unit-4',
     testNumber: 4,
-    unitTitle: 'Unit 4 (Test 4): Figurative Comparisons & Address',
+    unitTitle: 'Unit 4',
     description: 'Allusion, Analogy, Anecdote, and Apostrophe.',
     terms: ['Allusion', 'Analogy', 'Anecdote', 'Apostrophe'],
     termsDetailed: [
@@ -161,7 +161,7 @@ export const RHETORICAL_COURSE_UNITS: RhetoricalCourseUnit[] = [
   {
     id: 'unit-5',
     testNumber: 5,
-    unitTitle: 'Unit 5 (Test 5): Irony, Paradox & Indirect Language',
+    unitTitle: 'Unit 5',
     description: 'Irony, Paradox, Euphemism, and Double Entendre.',
     terms: ['Irony', 'Paradox', 'Euphemism', 'Double Entendre'],
     termsDetailed: [
@@ -190,7 +190,7 @@ export const RHETORICAL_COURSE_UNITS: RhetoricalCourseUnit[] = [
   {
     id: 'unit-6',
     testNumber: '6 (Review)',
-    unitTitle: 'Unit 6 (Test 6): Cumulative Review 1–5',
+    unitTitle: 'Unit 6',
     description: 'Comprehensive review covering all 24 terms from Tests 1 through 5.',
     terms: [
       'Diction',
@@ -223,7 +223,7 @@ export const RHETORICAL_COURSE_UNITS: RhetoricalCourseUnit[] = [
   {
     id: 'unit-7',
     testNumber: 7,
-    unitTitle: 'Unit 7 (Test 7): Logical Fallacies',
+    unitTitle: 'Unit 7',
     description: 'Core AP Lang argumentative flaws and logical fallacies.',
     terms: [
       'Ad Hominem',
@@ -273,7 +273,7 @@ export const RHETORICAL_COURSE_UNITS: RhetoricalCourseUnit[] = [
   {
     id: 'unit-8',
     testNumber: 8,
-    unitTitle: 'Unit 8 (Test 8): Reasoning Patterns & Syllogisms',
+    unitTitle: 'Unit 8',
     description: 'Antithesis, Deductive Reasoning, Syllogism, and Inductive Reasoning.',
     terms: ['Antithesis', 'Deductive Reasoning', 'Syllogism', 'Inductive Reasoning'],
     termsDetailed: [
@@ -302,7 +302,7 @@ export const RHETORICAL_COURSE_UNITS: RhetoricalCourseUnit[] = [
   {
     id: 'unit-9',
     testNumber: 9,
-    unitTitle: 'Unit 9 (Test 9): Repetition, Metonymy & Wordplay',
+    unitTitle: 'Unit 9',
     description: 'Metonymy, Anaphora, Epistrophe, and Malapropism.',
     terms: ['Metonymy', 'Anaphora', 'Epistrophe', 'Malapropism'],
     termsDetailed: [
@@ -331,7 +331,7 @@ export const RHETORICAL_COURSE_UNITS: RhetoricalCourseUnit[] = [
   {
     id: 'unit-10',
     testNumber: 10,
-    unitTitle: 'Unit 10 (Test 10): Satire, Tropes & Complex Schemes',
+    unitTitle: 'Unit 10',
     description: 'Synecdoche, Zeugma, Satire, and Parody.',
     terms: ['Synecdoche', 'Zeugma', 'Satire', 'Parody'],
     termsDetailed: [
@@ -359,7 +359,7 @@ export const RHETORICAL_COURSE_UNITS: RhetoricalCourseUnit[] = [
   {
     id: 'full-curriculum',
     testNumber: 'All',
-    unitTitle: 'Complete Course Master Set (Tests 1–10)',
+    unitTitle: 'Cumulative Review',
     description: 'All 44 course terms from the entire AP Language & Composition curriculum.',
     terms: [
       'Diction',

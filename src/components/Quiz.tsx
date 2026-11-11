@@ -92,17 +92,22 @@ export function Quiz({ questions: initialQuestions, vocabularyWords }: QuizProps
   }
 
   if (showResults) {
-    const percentage = Math.round((score / questions.length) * 100);
+    const total = questions.length || 1;
+    const accuracy = Math.min(100, Math.max(0, Math.round((score / total) * 100)));
     return (
       <Card className="mx-auto flex max-w-xl flex-col items-center gap-6 text-center">
         <Badge variant="brand" className="rounded-full px-4 py-1 text-xs uppercase tracking-[0.2em]">
           <Trophy className="mr-2 h-4 w-4" /> Quiz Complete
         </Badge>
-        <div className="flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-brand-500 text-4xl font-bold text-white shadow-lg shadow-brand-500/40">
-          {percentage}%
+        <div className="flex h-32 w-32 flex-col items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-brand-500 text-white shadow-lg shadow-brand-500/40">
+          <span className="text-3xl font-bold">{accuracy}%</span>
+          <span className="text-[10px] uppercase font-semibold tracking-wider opacity-90">Accuracy</span>
+        </div>
+        <div className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+          Score: {score} / {questions.length} · Accuracy: {accuracy} / 100
         </div>
         <p className="max-w-md text-sm text-slate-600 dark:text-slate-300">
-          You answered {score} of {questions.length} questions correctly. Keep practicing to reinforce your memory!
+          You answered {score} of {questions.length} questions correctly ({accuracy}% accuracy). Keep practicing to reinforce your memory!
         </p>
         <Button variant="outline" onClick={restart}>
           <RotateCcw className="h-4 w-4" /> Try again

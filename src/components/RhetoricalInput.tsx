@@ -34,6 +34,7 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
   const [pendingCached, setPendingCached] = useState<ReturnType<typeof getCachedRhetoricalResult>>(null);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [termsList, setTermsList] = useState<string[]>(['']);
+  const [difficulty, setDifficulty] = useState<'easy' | 'standard' | 'hard'>('standard');
   const [showCourseNotes, setShowCourseNotes] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +84,19 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
     });
   };
 
+  const handlePaste = (event: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = event.clipboardData.getData('text');
+    const terms = pasted
+      .split(/[,\n]/)
+      .map((term) => term.trim())
+      .filter(Boolean);
+
+    if (terms.length > 1) {
+      event.preventDefault();
+      setTermsList(terms.slice(0, 30));
+    }
+  };
+
   const handleProcessParagraph = () => {
     if (!paragraphText.trim()) return;
     const terms = paragraphText
@@ -107,7 +121,7 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
       setError(null);
       setPendingCached(cached);
     } else {
-      setError('No cached rhetorical study packet found in local storage. Generate one first!');
+      setError('No cached rhetorical study set found in local storage. Generate one first!');
     }
   };
 
@@ -143,7 +157,7 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
 
     const signal = beginGeneration();
     try {
-      const result = await generateRhetoricalContent(normalized);
+      const result = await generateRhetoricalContent(normalized, difficulty);
       if (signal.aborted) return;
       setCachedRhetoricalResult(normalized, result);
       onGenerate(result, normalized);
@@ -183,154 +197,227 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
 
       {/* Main Workspace Card */}
       <div className="card-glass rounded-3xl p-6 sm:p-10 relative overflow-hidden transition-all">
-        {/* Course Units Selector */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-mono tracking-wider uppercase text-zinc-500 dark:text-zinc-400 font-semibold">
-              Canonical Course Curriculum (Tests 1–10)
-            </span>
-            {activeUnit && (
-              <button
-                onClick={() => setShowCourseNotes(!showCourseNotes)}
-                className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-medium"
-              >
-                {showCourseNotes ? 'Hide Definitions' : 'View Definitions'}
-                {showCourseNotes ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-            {/* Empty / Clear Placeholder Card (Default Selection) */}
+        {/* Top Control Bar: List Entry vs Extract from Text */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-6 border-b border-zinc-200 dark:border-white/[0.08]">
+          <div className="flex items-center gap-2">
             <button
-              onClick={handleClearToEmpty}
-              className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-                selectedUnitId === null
-                  ? 'border-emerald-500 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200 shadow-sm'
-                  : 'border-zinc-200 dark:border-white/[0.06] bg-zinc-50 dark:bg-white/[0.02] text-zinc-700 dark:text-zinc-300 hover:border-emerald-500/40'
+              onClick={() => setInputMode('list')}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all cursor-pointer ${
+                inputMode === 'list'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 dark:bg-white/[0.04]'
               }`}
             >
-              <div className="flex items-center gap-1.5">
-                <X className="h-3.5 w-3.5 text-zinc-400" />
-                <span className="text-xs font-semibold">Custom (Empty)</span>
-              </div>
-              <div className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate mt-1">
-                Clear devices
-              </div>
+              List Entry
             </button>
-
-            {RHETORICAL_COURSE_UNITS.map((unit) => {
-              const isSelected = unit.id === selectedUnitId;
-              return (
-                <button
-                  key={unit.id}
-                  onClick={() => handleSelectUnit(unit)}
-                  className={`p-3 rounded-2xl border text-left transition-all ${
-                    isSelected
-                      ? 'border-emerald-500 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200 shadow-sm'
-                      : 'border-zinc-200 dark:border-white/[0.06] bg-zinc-50 dark:bg-white/[0.02] text-zinc-700 dark:text-zinc-300 hover:border-emerald-500/40'
-                  }`}
-                >
-                  <div className="text-xs font-semibold truncate">{unit.unitTitle}</div>
-                  <div className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate mt-0.5">
-                    {unit.terms.length} devices
-                  </div>
-                </button>
-              );
-            })}
+            <button
+              onClick={() => setInputMode('paragraph')}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all cursor-pointer ${
+                inputMode === 'paragraph'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 dark:bg-white/[0.04]'
+              }`}
+            >
+              Extract from Text
+            </button>
           </div>
 
-          {/* Collapsible Course Notes */}
-          <AnimatePresence>
-            {showCourseNotes && activeUnit && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mt-4 p-5 rounded-2xl bg-zinc-100 dark:bg-zinc-950/60 border border-zinc-200 dark:border-white/[0.08] space-y-3"
-              >
-                <div className="font-serif text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                  {activeUnit.unitTitle} — Teacher PPT Notes
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  {activeUnit.termsDetailed.map((td) => (
-                    <div key={td.term} className="p-3 rounded-xl bg-white dark:bg-white/[0.03] border border-zinc-200 dark:border-white/[0.06]">
-                      <span className="font-semibold text-emerald-600 dark:text-emerald-400 block">{td.term}</span>
-                      <p className="text-zinc-600 dark:text-zinc-400 text-[11px] mt-0.5">{td.definition}</p>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+              <strong className="text-zinc-900 dark:text-zinc-100 font-semibold">{filledCount}</strong> devices added
+            </span>
+            <span className="text-xs text-zinc-400 dark:text-zinc-500">•</span>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">Goal: 2–30</span>
+          </div>
         </div>
 
         {/* Input Mode Content */}
-        <div className="space-y-6 pt-4 border-t border-zinc-200 dark:border-white/[0.08]">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono tracking-wider uppercase text-zinc-500 dark:text-zinc-400 font-semibold">
-              Active Devices to Study ({filledCount})
-            </span>
+        {inputMode === 'paragraph' ? (
+          <div className="space-y-4 mb-6">
+            <textarea
+              rows={8}
+              value={paragraphText}
+              onChange={(e) => setParagraphText(e.target.value)}
+              placeholder="Paste reading passages, speech excerpts, rhetorical handouts, or PPT notes here. Rhetorical devices will be extracted automatically..."
+              className="w-full p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-white/[0.08] text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-mono"
+            />
             <button
-              onClick={handleAddTerm}
-              className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-semibold"
+              onClick={handleProcessParagraph}
+              disabled={!paragraphText.trim()}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs uppercase tracking-wider transition-all disabled:opacity-40 cursor-pointer shadow-md"
             >
-              <Plus className="h-3.5 w-3.5" /> Add Device
+              <Sparkles className="h-4 w-4" />
+              <span>Parse Rhetorical Devices From Text</span>
             </button>
           </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Course Units Selector */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] font-mono tracking-wider uppercase text-zinc-500 dark:text-zinc-400 font-semibold">
+                  Course Units
+                </span>
+                {activeUnit && (
+                  <button
+                    onClick={() => setShowCourseNotes(!showCourseNotes)}
+                    className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-medium"
+                  >
+                    {showCourseNotes ? 'Hide Definitions' : 'View Definitions'}
+                    {showCourseNotes ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                  </button>
+                )}
+              </div>
 
-          {/* Terms Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
-            <AnimatePresence initial={false}>
-              {termsList.map((term, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="flex items-center gap-1.5 p-1 rounded-xl bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-white/[0.08]"
+              <div className="flex flex-wrap gap-2">
+                {/* Empty / Clear Placeholder Card (Default Selection) */}
+                <button
+                  onClick={handleClearToEmpty}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-medium border transition-all flex items-center gap-1.5 cursor-pointer ${
+                    selectedUnitId === null
+                      ? 'border-emerald-500 bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 shadow-sm font-semibold'
+                      : 'border-zinc-200 dark:border-white/[0.08] bg-zinc-100 dark:bg-white/[0.03] text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-white/20'
+                  }`}
                 >
-                  <input
-                    type="text"
-                    value={term}
-                    onChange={(e) => handleTermChange(index, e.target.value)}
-                    placeholder="Rhetorical Device"
-                    className="flex-1 px-2.5 py-1.5 bg-transparent text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none font-medium"
-                  />
-                  {termsList.length > 1 && (
+                  <X className="h-3 w-3 text-zinc-400" />
+                  <span>Clear (Empty)</span>
+                </button>
+
+                {RHETORICAL_COURSE_UNITS.map((unit) => {
+                  const isSelected = unit.id === selectedUnitId;
+                  return (
                     <button
-                      onClick={() => handleRemoveTerm(index)}
-                      className="p-1 rounded-lg text-zinc-400 hover:text-rose-500 transition-colors"
+                      key={unit.id}
+                      onClick={() => handleSelectUnit(unit)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-medium border transition-all flex items-center gap-1.5 cursor-pointer ${
+                        isSelected
+                          ? 'border-emerald-500 bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 shadow-sm font-semibold'
+                          : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20'
+                      }`}
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <span>{unit.unitTitle}</span>
+                      <span className="text-[10px] opacity-70">({unit.terms.length})</span>
                     </button>
-                  )}
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
+                  );
+                })}
+              </div>
 
-          {/* Action Row */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-zinc-200 dark:border-white/[0.08]">
-            <button
-              onClick={handleCheckCache}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-semibold tracking-wide transition-all"
-              title="Load any previously stored rhetorical study packet without using API credits"
-            >
-              <Database className="h-3.5 w-3.5" />
-              <span>Load Cached Packet</span>
-            </button>
+              {/* Collapsible Course Notes */}
+              <AnimatePresence>
+                {showCourseNotes && activeUnit && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-4 p-5 rounded-2xl bg-zinc-100 dark:bg-zinc-950/60 border border-zinc-200 dark:border-white/[0.08] space-y-3"
+                  >
+                    <div className="font-serif text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex flex-wrap items-baseline gap-2">
+                      <span>{activeUnit.unitTitle} — Teacher PPT Notes</span>
+                      {activeUnit.description && (
+                        <span className="text-xs font-sans font-normal text-zinc-500 dark:text-zinc-400">({activeUnit.description})</span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      {activeUnit.termsDetailed.map((td) => (
+                        <div key={td.term} className="p-3 rounded-xl bg-white dark:bg-white/[0.03] border border-zinc-200 dark:border-white/[0.06]">
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400 block">{td.term}</span>
+                          <p className="text-zinc-600 dark:text-zinc-400 text-[11px] mt-0.5">{td.definition}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
-            <button
-              onClick={hasKey ? handleGenerateClick : onOpenApiKeyModal}
-              disabled={hasKey && (isGenerating || filledCount < 2)}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white font-semibold text-xs tracking-wide uppercase shadow-md shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40"
-            >
-              {hasKey ? <Sparkles className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}
-              <span>{!hasKey ? 'Add API key to generate' : isGenerating ? 'Synthesizing...' : 'Generate Sentence Game & Quiz'}</span>
-            </button>
+            {/* Active Devices Section */}
+            <div className="space-y-4 pt-4 border-t border-zinc-200 dark:border-white/[0.08]">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono tracking-wider uppercase text-zinc-500 dark:text-zinc-400 font-semibold">
+                  Active Devices to Study ({filledCount})
+                </span>
+                <button
+                  onClick={handleAddTerm}
+                  className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-semibold cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Device
+                </button>
+              </div>
+
+              {/* Terms Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+                <AnimatePresence initial={false}>
+                  {termsList.map((term, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className="flex items-center gap-1.5 p-1 rounded-xl bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-white/[0.08]"
+                    >
+                      <input
+                        type="text"
+                        value={term}
+                        onChange={(e) => handleTermChange(index, e.target.value)}
+                        onPaste={index === 0 ? handlePaste : undefined}
+                        placeholder={index === 0 ? 'Type or paste device list...' : 'Rhetorical Device'}
+                        className="flex-1 px-2.5 py-1.5 bg-transparent text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none font-medium"
+                      />
+                      {termsList.length > 1 && (
+                        <button
+                          onClick={() => handleRemoveTerm(index)}
+                          className="p-1 rounded-lg text-zinc-400 hover:text-rose-500 transition-colors cursor-pointer"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </div>
+
+            {/* Action Row */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-zinc-200 dark:border-white/[0.08]">
+              <button
+                onClick={handleCheckCache}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-semibold tracking-wide transition-all cursor-pointer"
+                title="Load any previously stored rhetorical study set without using API credits"
+              >
+                <Database className="h-3.5 w-3.5" />
+                <span>Load Cached Set</span>
+              </button>
+
+              {/* Difficulty Mode Selector */}
+              <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs">
+                <span className="text-[10px] font-semibold uppercase text-zinc-400 px-2 tracking-wider">Mode:</span>
+                {(['easy', 'standard', 'hard'] as const).map((diff) => (
+                  <button
+                    key={diff}
+                    type="button"
+                    onClick={() => setDifficulty(diff)}
+                    className={`px-2.5 py-1 rounded-lg font-semibold capitalize transition-all cursor-pointer ${
+                      difficulty === diff
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {diff === 'standard' ? 'Standard' : diff}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={hasKey ? handleGenerateClick : onOpenApiKeyModal}
+                disabled={hasKey && (isGenerating || filledCount < 2)}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white font-semibold text-xs tracking-wide uppercase shadow-md shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 cursor-pointer"
+              >
+                {hasKey ? <Sparkles className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}
+                <span>{!hasKey ? 'Add API key to generate' : isGenerating ? 'Synthesizing...' : 'Generate Sentence Game & Quiz'}</span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Error Alert */}
         {error && (
@@ -348,11 +435,11 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
       <ConfirmDialog
         isOpen={pendingCached !== null}
         theme="rhetoric"
-        title="Load your saved rhetoric packet?"
+        title="Load your saved study set?"
         message={
           pendingCached && (
             <>
-              Opens the rhetoric packet you saved for {pendingCached.terms.length} terms:{' '}
+              Opens the study set you saved for {pendingCached.terms.length} terms:{' '}
               <span className="font-semibold text-zinc-800 dark:text-zinc-200">
                 {pendingCached.terms.slice(0, 5).join(', ')}
                 {pendingCached.terms.length > 5 ? ', …' : ''}
@@ -361,7 +448,7 @@ export function RhetoricalInput({ onGenerate, onLoadingChange, onOpenApiKeyModal
             </>
           )
         }
-        confirmLabel="Load saved rhetoric packet"
+        confirmLabel="Load saved study set"
         onCancel={() => setPendingCached(null)}
         onConfirm={() => {
           if (pendingCached) {

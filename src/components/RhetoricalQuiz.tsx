@@ -81,7 +81,8 @@ export function RhetoricalQuiz({ questions: initialQuestions, rhetoricalTerms = 
   }
 
   if (showResults) {
-    const percentage = Math.round((score / questions.length) * 100);
+    const total = questions.length || 1;
+    const accuracy = Math.min(100, Math.max(0, Math.round((score / total) * 100)));
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -98,14 +99,17 @@ export function RhetoricalQuiz({ questions: initialQuestions, rhetoricalTerms = 
           </Badge>
           <h2 className="text-3xl font-extrabold text-white">Rhetorical Quiz Results</h2>
           <p className="text-slate-400 text-sm mt-1">
-            You scored {score} out of {questions.length} questions ({percentage}%)
+            You scored {score} out of {questions.length} questions ({accuracy}% accuracy)
           </p>
         </div>
 
         <div className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 max-w-sm mx-auto">
-          <div className="text-3xl font-extrabold text-emerald-400">{percentage}%</div>
-          <div className="text-xs text-slate-400 mt-1">
-            {percentage >= 80 ? 'Mastery demonstrated in rhetorical devices!' : 'Good practice! Review the missed devices.'}
+          <div className="text-3xl font-extrabold text-emerald-400">{accuracy}%</div>
+          <div className="text-xs font-semibold text-emerald-300/80 uppercase tracking-wider mt-0.5">
+            Accuracy ({accuracy} / 100)
+          </div>
+          <div className="text-xs text-slate-400 mt-2">
+            {accuracy >= 80 ? 'Mastery demonstrated in rhetorical devices!' : 'Good practice! Review the missed devices.'}
           </div>
         </div>
 

@@ -48,113 +48,85 @@ const extractAndParseJson = (text: string) => {
   }
 };
 
-export const generateQuizContent = async (vocabularyList: string[]): Promise<QuizGenerationResult> => {
+export const generateQuizContent = async (
+  vocabularyList: string[],
+  difficulty: 'easy' | 'standard' | 'hard' = 'standard'
+): Promise<QuizGenerationResult> => {
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
     const modelName = fallbackModel || 'gemini-3.8-flash';
     const model = genAI.getGenerativeModel({
       model: modelName,
-      // JSON mode avoids malformed replies (which force a full retry); lower thinking answers sooner
+      // JSON mode avoids malformed replies; lower thinking answers sooner and temperature provides high factual accuracy
       generationConfig: { responseMimeType: 'application/json', ...speedConfig(modelName) }
     });
     const vocabString = vocabularyList.join(', ');
 
-    // Generate Quiz Questions
-    const quizPrompt = `Create 10 multiple choice quiz questions for these AP Lang vocabulary words: ${vocabString}.
-    For each question, provide:
-    1. A sentence with a blank where the vocabulary word should go
-    2. Four answer choices (one correct, three incorrect)
-    3. The correct answer
-    
-    Format your response as JSON with this structure:
-    {
-      "questions": [
-        {
-          "question": "sentence with ___ blank",
-          "options": ["option1", "option2", "option3", "option4"],
-          "correct": 0,
-          "word": "vocabulary word"
-        }
-      ]
-    }`;
+    let quizDifficultyDirective = 'Make questions balanced AP English Language style questions with realistic distractors.';
+    let paragraphDifficultyDirective = 'Use engaging, balanced AP Lang level prose with vivid and distinctive context clues so the missing word is logical and identifiable.';
 
-    // Generate Flashcards
-    const flashcardPrompt = `Create comprehensive flashcards for these AP Lang vocabulary words: ${vocabString}.
-    
-    IMPORTANT: You MUST provide ALL of the following fields for each word:
-    1. The word
-    2. A clear, concise definition
-    3. Synonyms (comma-separated list of 2-3 words)
-    4. Antonyms (comma-separated list of 2-3 words)
-    5. A context sentence showing typical usage
-    6. Etymology (word origin and root meaning)
-    7. An example sentence using the word
-    8. A creative MNEMONIC - a memory trick, funny association, rhyme, or story to help remember the word
-    
-    Format your response as JSON with this structure:
-    {
-      "flashcards": [
-        {
-          "word": "vocabulary word",
-          "definition": "clear definition here",
-          "synonyms": "synonym1, synonym2, synonym3",
-          "antonyms": "antonym1, antonym2, antonym3",
-          "context": "A sentence showing typical usage context",
-          "etymology": "Word origin and root meaning",
-          "example": "An example sentence using the word",
-          "mnemonic": "A creative, memorable trick to remember this word"
-        }
-      ]
+    if (difficulty === 'easy') {
+      quizDifficultyDirective = 'Make questions straightforward with clear context clues and distinct, recognizable contrasts between the correct word and distractors.';
+      paragraphDifficultyDirective = 'Use clear sentence structures with direct, unmistakable context clues so the target word is straightforwardly identifiable.';
+    } else if (difficulty === 'hard') {
+      quizDifficultyDirective = 'Make questions very challenging AP-tier questions with subtle, sophisticated distinctions between nuanced options.';
+      paragraphDifficultyDirective = 'Use complex, elevated academic prose where subtle rhetorical clues and analytical tone identify the missing word.';
     }
-    
-    Do NOT skip any fields. Every flashcard must have all 8 fields filled in.`;
 
-    // Generate Matching pairs
-    const matchingPrompt = `Create matching pairs for these AP Lang vocabulary words: ${vocabString}.
-    Provide the word and a brief definition (5-10 words).
-    
-    Format your response as JSON with this structure:
-    {
-      "pairs": [
-        {
-          "word": "vocabulary word",
-          "definition": "brief definition"
-        }
-      ]
-    }`;
+    // Consolidated prompt: Generates Quiz, Flashcards, Matching, and Paragraph in ONE single API request (75% savings in key usage)
+    const combinedPrompt = `You are an elite AP English Language & Composition instructor creating a comprehensive study packet for these vocabulary words: ${vocabString}.
+Difficulty Level: ${difficulty}.
+Quiz Directive: ${quizDifficultyDirective}
+Passage Directive: ${paragraphDifficultyDirective}
 
-    // Generate Practice Paragraph
-    const paragraphPrompt = `Write a cohesive paragraph (150-200 words) that uses ALL of these AP Lang vocabulary words: ${vocabString}.
-    Make the paragraph engaging and contextually appropriate. Bold each vocabulary word when used.
-    Also provide comprehension questions about the vocabulary usage.
-    
-    Format your response as JSON with this structure:
-    {
-      "paragraph": "the paragraph text with **bolded** vocab words",
-      "questions": [
-        {
-          "question": "comprehension question",
-          "answer": "correct answer"
-        }
-      ]
-    }`;
+Return a single JSON object containing ALL 4 modules:
+1. "questions": 10 multiple-choice quiz questions. Each question must have:
+   - "question": A sentence with a ___ blank where the word belongs
+   - "options": Array of 4 distinct choices (1 correct, 3 plausible distractors)
+   - "correct": Index (0, 1, 2, or 3) of the correct answer
+   - "word": The target vocabulary word
+2. "flashcards": Flashcards for each word in the vocabulary list. Each must have all 8 fields:
+   - "word": string
+   - "definition": clear, concise definition
+   - "synonyms": "syn1, syn2, syn3"
+   - "antonyms": "ant1, ant2, ant3"
+   - "context": a sentence showing typical usage context
+   - "etymology": word origin and root meaning
+   - "example": an example sentence using the word
+   - "mnemonic": a creative, memorable trick, rhyme, or association
+3. "pairs": Matching pairs for each word with:
+   - "word": vocabulary word
+   - "definition": concise 5-10 word definition
+4. "paragraph": A continuous, unified passage incorporating the vocabulary words:
+   - "paragraph": An authentic, coherent narrative or argument where EACH sentence containing a vocabulary word contains EXACTLY ONE target vocabulary word marked in **bold** (e.g. **candid**). Smooth transitions between sentences.
+   - "questions": 3-4 comprehension questions with "question" and "answer"
 
-    const [quizResult, flashcardResult, matchingResult, paragraphResult] = await Promise.all([
-      model.generateContent(quizPrompt, { signal }),
-      model.generateContent(flashcardPrompt, { signal }),
-      model.generateContent(matchingPrompt, { signal }),
-      model.generateContent(paragraphPrompt, { signal })
-    ]);
+Format response strictly as JSON with this structure:
+{
+  "questions": [
+    { "question": "...", "options": ["..."], "correct": 0, "word": "..." }
+  ],
+  "flashcards": [
+    { "word": "...", "definition": "...", "synonyms": "...", "antonyms": "...", "context": "...", "etymology": "...", "example": "...", "mnemonic": "..." }
+  ],
+  "pairs": [
+    { "word": "...", "definition": "..." }
+  ],
+  "paragraph": {
+    "paragraph": "...",
+    "questions": [
+      { "question": "...", "answer": "..." }
+    ]
+  }
+}`;
 
-    const quizData = extractAndParseJson(quizResult.response.text());
-    const flashcardData = extractAndParseJson(flashcardResult.response.text());
-    const matchingData = extractAndParseJson(matchingResult.response.text());
-    const paragraphData = extractAndParseJson(paragraphResult.response.text());
+    const result = await model.generateContent(combinedPrompt, { signal });
+    const data = extractAndParseJson(result.response.text());
 
     return {
-      quiz: quizData.questions || [],
-      flashcards: flashcardData.flashcards || [],
-      matching: matchingData.pairs || [],
-      paragraph: paragraphData
+      quiz: data.questions || data.quiz || [],
+      flashcards: data.flashcards || [],
+      matching: data.pairs || data.matching || [],
+      paragraph: data.paragraph || { paragraph: '', questions: [] }
     };
   });
 };
@@ -208,7 +180,7 @@ export interface QuizGenerationResult {
 
 export const generateMoreQuizQuestions = async (
   vocabularyList: string[],
-  difficulty: 'easy' | 'medium' | 'hard' | 'custom' = 'medium',
+  difficulty: 'easy' | 'standard' | 'medium' | 'hard' | 'custom' = 'standard',
   customTopic: string = ''
 ): Promise<QuizQuestion[]> => {
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
@@ -217,13 +189,13 @@ export const generateMoreQuizQuestions = async (
 
     let difficultyInstruction = '';
     if (difficulty === 'easy') {
-      difficultyInstruction = 'Make the questions straightforward with clear distinctions between the correct answer and distractors.';
-    } else if (difficulty === 'medium') {
-      difficultyInstruction = 'Make the questions moderately challenging with subtle differences between options.';
+      difficultyInstruction = 'Make the questions straightforward with clear context hints and distinct contrasts between the correct answer and distractors.';
     } else if (difficulty === 'hard') {
-      difficultyInstruction = 'Make the questions very challenging, requiring deep understanding of nuances and context.';
+      difficultyInstruction = 'Make the questions very challenging AP-tier questions, requiring deep understanding of subtle nuances, connotation, and context.';
     } else if (difficulty === 'custom' && customTopic) {
       difficultyInstruction = `Focus the questions on: ${customTopic}`;
+    } else {
+      difficultyInstruction = 'Make the questions authentic AP English Language style questions with balanced difficulty and plausible distractors.';
     }
 
     const quizPrompt = `Create 5 multiple choice quiz questions for these AP Lang vocabulary words: ${vocabString}.
@@ -254,7 +226,7 @@ export const generateMoreQuizQuestions = async (
 
 export const generateMoreParagraph = async (
   vocabularyList: string[],
-  difficulty: 'easy' | 'medium' | 'hard' | 'custom' = 'medium',
+  difficulty: 'easy' | 'standard' | 'medium' | 'hard' | 'custom' = 'standard',
   customTopic: string = ''
 ): Promise<ParagraphData> => {
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
@@ -265,28 +237,28 @@ export const generateMoreParagraph = async (
     let themeInstruction = '';
 
     if (difficulty === 'easy') {
-      difficultyInstruction = 'Use simple sentence structures and clear contexts for each vocabulary word.';
-    } else if (difficulty === 'medium') {
-      difficultyInstruction = 'Use moderately complex sentence structures with nuanced contexts.';
+      difficultyInstruction = 'Use simple, clear sentence structures with direct, unmistakable context clues so each word choice is straightforwardly identifiable.';
     } else if (difficulty === 'hard') {
-      difficultyInstruction = 'Use sophisticated sentence structures and challenging, abstract contexts.';
+      difficultyInstruction = 'Use sophisticated sentence structures and challenging, abstract analytical contexts where nuanced clues indicate the word.';
     } else if (difficulty === 'custom' && customTopic) {
       themeInstruction = `Focus the paragraph on the theme: ${customTopic}`;
+    } else {
+      difficultyInstruction = 'Use engaging, balanced AP Lang level prose with vivid and distinctive context clues so each word choice makes sense and is identifiable.';
     }
 
-    const paragraphPrompt = `Create a cohesive paragraph that naturally incorporates these AP Lang vocabulary words: ${vocabString}.
+    const paragraphPrompt = `Create an authentic, challenging AP English Language passage or narrative that reads as ONE continuous, unified piece of writing naturally incorporating these vocabulary words: ${vocabString}.
     ${difficultyInstruction}
     ${themeInstruction}
     
-    Requirements:
-    1. Write a 150-200 word paragraph
-    2. Mark each vocabulary word with **bold** formatting like **word**
-    3. Use each word correctly in context
-    4. Create 3-4 comprehension questions about the paragraph
+    CRITICAL RULES FOR COHESION AND RIGOR:
+    1. The passage MUST read as a single, connected, flowing narrative or persuasive argument—NOT disconnected sentences. Ensure smooth, natural transitions between consecutive sentences.
+    2. EACH sentence containing a vocabulary word MUST contain EXACTLY ONE target vocabulary word marked in **bold** (e.g. **word**). Never put multiple target vocabulary words in the same sentence.
+    3. The context must meaningfully challenge the reader: embed rich rhetorical context clues and tone so the word choice is logical and verifiable through careful analytical reading.
+    4. Create 3-4 comprehension questions about the paragraph.
     
     Format your response as JSON with this structure:
     {
-      "paragraph": "Your paragraph text with **vocabulary** words in **bold**",
+      "paragraph": "Your unified, continuous paragraph text with strictly one **bolded** vocabulary word per sentence",
       "questions": [
         {
           "question": "comprehension question",
@@ -411,136 +383,100 @@ export interface RhetoricalGenerationResult {
   passage: RhetoricalPassageData;
 }
 
-export const generateRhetoricalContent = async (termsList: string[]): Promise<RhetoricalGenerationResult> => {
+export const generateRhetoricalContent = async (
+  termsList: string[],
+  difficulty: 'easy' | 'standard' | 'hard' = 'standard'
+): Promise<RhetoricalGenerationResult> => {
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
     const modelName = fallbackModel || 'gemini-3.8-flash';
     const model = genAI.getGenerativeModel({
       model: modelName,
-      // JSON mode avoids malformed replies (which force a full retry); lower thinking answers sooner
+      // JSON mode avoids malformed replies; lower thinking answers sooner and temperature provides high factual accuracy
       generationConfig: { responseMimeType: 'application/json', ...speedConfig(modelName) }
     });
     const termsString = termsList.join(', ');
 
-    // 1. Rhetorical Flashcards
-    const flashcardPrompt = `Create comprehensive AP Language & Composition flashcards for these rhetorical terms/devices: ${termsString}.
-    
-    IMPORTANT: Provide ALL of the following fields for each term:
-    1. "term": Exact rhetorical device name
-    2. "definition": Clear, precise definition
-    3. "rhetoricalEffect": Why an author/speaker uses this device (persuasive impact, tone, cadence, emotional appeal)
-    4. "exampleSentence": A clear modern example sentence illustrating the device
-    5. "historicExample": A famous literary, historical, or oratorical quote demonstrating this device (attribute author/speaker)
-    6. "etymology": Greek/Latin root or linguistic origin
-    7. "mnemonic": A memorable memory trick, rhyme, or visual association
-    
-    Format as JSON:
-    {
-      "flashcards": [
-        {
-          "term": "Anaphora",
-          "definition": "The repetition of a word or phrase at the beginning of successive clauses.",
-          "rhetoricalEffect": "Builds rhythmic momentum, emotional intensity, and emphasizes a central theme.",
-          "exampleSentence": "We will stand together, we will fight together, and we will win together.",
-          "historicExample": "I have a dream... I have a dream today. (Martin Luther King Jr.)",
-          "etymology": "Greek: ana- (again) + pherein (to carry)",
-          "mnemonic": "Anaphora = A New phrase starting every line again."
-        }
-      ]
-    }`;
+    let diffInstructionQuiz = 'balanced AP Language exam rigor';
+    let diffInstructionSentence = 'clear, identifiable rhetorical moves';
+    if (difficulty === 'easy') {
+      diffInstructionQuiz = 'straightforward questions with obvious rhetorical patterns and distinct distractors';
+      diffInstructionSentence = 'vivid, prototypical sentences with clear and unmistakable syntactic traits';
+    } else if (difficulty === 'hard') {
+      diffInstructionQuiz = 'advanced, subtle questions examining complex rhetorical functions and nuanced distinctions';
+      diffInstructionSentence = 'sophisticated, multi-clause literary excerpts with subtle stylistic maneuvers';
+    }
 
-    // 2. Sentence Guessing & Matching items
-    const sentenceMatchPrompt = `Create sentence guessing challenges for these AP Lang rhetorical terms: ${termsString}.
-    For EACH term, generate:
-    1. "term": The rhetorical device name
-    2. "targetSentence": A rich, vivid sentence that clearly and unquestionably demonstrates this specific rhetorical device.
-    3. "keyFeature": The specific phrase or syntactic pattern in the sentence that creates this device (e.g., "reversal of words A-B into B-A" or "deliberate omission of conjunctions").
-    4. "explanation": A detailed, educational explanation of why this sentence matches the device and how it creates its rhetorical effect.
-    5. "distractorSentences": Exactly 3 well-crafted sentences that DO NOT use this device (they should each use a different rhetorical device or normal grammar), each with a brief "deviceOrReason" explaining why it is NOT the target device.
-    
-    Format as JSON:
-    {
-      "sentenceMatches": [
-        {
-          "term": "Chiasmus",
-          "targetSentence": "Let us never negotiate out of fear, but let us never fear to negotiate.",
-          "keyFeature": "reversal of words 'negotiate out of fear' into 'fear to negotiate' (A-B-B-A structure)",
-          "explanation": "Chiasmus reverses the grammatical structure or words in successive phrases to highlight contrast and balance.",
-          "distractorSentences": [
-            {
-              "sentence": "He was a lion in battle, fierce and untamed.",
-              "deviceOrReason": "This is a metaphor comparing courage to a lion, not chiasmus."
-            },
-            {
-              "sentence": "I came, I saw, I conquered.",
-              "deviceOrReason": "This is asyndeton/tricolon (rapid listing without conjunctions), not chiasmus."
-            },
-            {
-              "sentence": "The wind howled through the empty corridors all night.",
-              "deviceOrReason": "This is personification giving human traits to the wind, not chiasmus."
-            }
-          ]
-        }
-      ]
-    }`;
+    // Consolidated prompt: Generates Flashcards, Sentence Matches, Quiz, and Passage in ONE single request (75% savings in key usage)
+    const combinedPrompt = `You are an elite AP English Language & Composition instructor creating a complete study packet for these rhetorical terms/devices: ${termsString}.
+Difficulty Level: ${difficulty}.
+Quiz Directive: ${diffInstructionQuiz}
+Sentence Challenge Directive: ${diffInstructionSentence}
 
-    // 3. AP Lang Multiple Choice Quiz
-    const quizPrompt = `Create 10 AP Language & Composition style multiple choice questions testing these rhetorical terms: ${termsString}.
-    Each question should present a quote, excerpt, or scenario and ask students to identify the rhetorical device or analyze its rhetorical function.
-    
-    Format as JSON:
-    {
-      "questions": [
-        {
-          "question": "In the excerpt: '...', which rhetorical device is predominantly utilized to heighten the speaker's urgency?",
-          "options": ["Option A", "Option B", "Option C", "Option D"],
-          "correct": 0,
-          "term": "term name",
-          "explanation": "Detailed explanation of why this is correct."
-        }
-      ]
-    }`;
+Return a single JSON object containing ALL 4 modules:
 
-    // 4. Rhetorical Analysis Passage
-    const passagePrompt = `Write an eloquent, cohesive persuasive speech or essay passage (175-250 words) that naturally employs several of these rhetorical devices: ${termsString}.
-    Bold the devices used in the text like **[Device: excerpt]** or **excerpt (Device)**.
-    Provide 3-4 AP Lang style rhetorical analysis prompts analyzing how the speaker uses rhetorical devices to achieve their purpose, with model analytical answers.
-    
-    Format as JSON:
-    {
-      "passage": "Full passage text...",
-      "devicesUsed": ["Anaphora", "Chiasmus", "Polysyndeton"],
-      "questions": [
-        {
-          "question": "How does the speaker's use of anaphora in paragraph 1 reinforce their call to action?",
-          "answer": "The repeated opening creates a rhythmic urgency that unites the listeners..."
-        }
-      ]
-    }`;
+1. "flashcards": Flashcards for each term with:
+   - "term": Exact device name
+   - "definition": Clear, precise definition
+   - "rhetoricalEffect": Why an author/speaker uses it (persuasive impact, tone, cadence, emotional appeal)
+   - "exampleSentence": Clear modern example sentence illustrating the device
+   - "historicExample": Famous literary, historical, or oratorical quote demonstrating this device with speaker attribution
+   - "etymology": Greek/Latin root or linguistic origin
+   - "mnemonic": Creative memory trick, rhyme, or association
 
-    const [flashcardResult, sentenceMatchResult, quizResult, passageResult] = await Promise.all([
-      model.generateContent(flashcardPrompt, { signal }),
-      model.generateContent(sentenceMatchPrompt, { signal }),
-      model.generateContent(quizPrompt, { signal }),
-      model.generateContent(passagePrompt, { signal })
-    ]);
+2. "sentenceMatches": Sentence guessing challenges for EACH term:
+   - "term": Rhetorical device name
+   - "targetSentence": Rich, vivid sentence that clearly and unquestionably demonstrates this specific rhetorical device
+   - "keyFeature": Specific syntactic pattern or phrase creating the device
+   - "explanation": Detailed educational explanation of why it matches and its effect
+   - "distractorSentences": Exactly 3 sentences that DO NOT use this device, each with "sentence" and "deviceOrReason"
 
-    const flashcardData = extractAndParseJson(flashcardResult.response.text());
-    const sentenceMatchData = extractAndParseJson(sentenceMatchResult.response.text());
-    const quizData = extractAndParseJson(quizResult.response.text());
-    const passageData = extractAndParseJson(passageResult.response.text());
+3. "questions": 10 AP Language multiple-choice questions:
+   - "question": Quote, excerpt, or scenario asking to identify the device or its function
+   - "options": 4 choices (one correct, 3 plausible distractors)
+   - "correct": Index (0, 1, 2, or 3) of correct option
+   - "term": Device name
+   - "explanation": Detailed explanation of why it is correct
+
+4. "passage": Eloquent, cohesive speech or essay passage (175-250 words):
+   - "passage": Full text with devices bolded in text (e.g. **[Anaphora: ...]**)
+   - "devicesUsed": Array of device names used
+   - "questions": 3-4 AP Lang style rhetorical analysis questions with "question" and "answer"
+
+Format response strictly as JSON with this structure:
+{
+  "flashcards": [
+    { "term": "...", "definition": "...", "rhetoricalEffect": "...", "exampleSentence": "...", "historicExample": "...", "etymology": "...", "mnemonic": "..." }
+  ],
+  "sentenceMatches": [
+    { "term": "...", "targetSentence": "...", "keyFeature": "...", "explanation": "...", "distractorSentences": [{ "sentence": "...", "deviceOrReason": "..." }] }
+  ],
+  "questions": [
+    { "question": "...", "options": ["..."], "correct": 0, "term": "...", "explanation": "..." }
+  ],
+  "passage": {
+    "passage": "...",
+    "devicesUsed": ["..."],
+    "questions": [
+      { "question": "...", "answer": "..." }
+    ]
+  }
+}`;
+
+    const result = await model.generateContent(combinedPrompt, { signal });
+    const data = extractAndParseJson(result.response.text());
 
     return {
-      flashcards: flashcardData.flashcards || [],
-      sentenceMatches: sentenceMatchData.sentenceMatches || [],
-      quiz: quizData.questions || [],
-      passage: passageData
+      flashcards: data.flashcards || [],
+      sentenceMatches: data.sentenceMatches || [],
+      quiz: data.questions || data.quiz || [],
+      passage: data.passage || { passage: '', questions: [] }
     };
   });
 };
 
 export const generateMoreRhetoricalQuizQuestions = async (
   termsList: string[],
-  difficulty: 'easy' | 'medium' | 'hard' | 'custom' = 'medium',
+  difficulty: 'easy' | 'standard' | 'medium' | 'hard' | 'custom' = 'standard',
   customTopic: string = ''
 ): Promise<RhetoricalQuizQuestion[]> => {
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
@@ -550,12 +486,12 @@ export const generateMoreRhetoricalQuizQuestions = async (
     let instruction = '';
     if (difficulty === 'easy') {
       instruction = 'Provide straightforward examples with obvious syntactic patterns.';
-    } else if (difficulty === 'medium') {
-      instruction = 'Provide authentic-feeling literary/speech excerpts with plausible distractors.';
     } else if (difficulty === 'hard') {
       instruction = 'Provide complex, nuanced excerpts where distinguishing between subtle rhetorical devices requires deep AP Lang analysis.';
     } else if (difficulty === 'custom' && customTopic) {
       instruction = `Focus the questions and excerpts around: ${customTopic}`;
+    } else {
+      instruction = 'Provide authentic-feeling literary/speech excerpts with plausible distractors.';
     }
 
     const prompt = `Create 5 AP Lang multiple choice questions for these rhetorical terms: ${termsString}.
@@ -582,7 +518,7 @@ export const generateMoreRhetoricalQuizQuestions = async (
 
 export const generateMoreRhetoricalPassage = async (
   termsList: string[],
-  difficulty: 'easy' | 'medium' | 'hard' | 'custom' = 'medium',
+  difficulty: 'easy' | 'standard' | 'medium' | 'hard' | 'custom' = 'standard',
   customTopic: string = ''
 ): Promise<RhetoricalPassageData> => {
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {

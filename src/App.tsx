@@ -1,9 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   BookOpen,
   Brain,
   FileText,
-  Grid3X3,
   Feather,
   Target,
   RotateCcw,
@@ -16,19 +15,21 @@ import {
   Flame
 } from 'lucide-react';
 import SplashScreen from './components/SplashScreen';
-import { Flashcards } from './components/Flashcards';
-import Quiz from './components/Quiz';
-import { GameArea } from './components/GameArea';
-import ParagraphPractice from './components/ParagraphPractice';
 import { Tabs, TabsList, TabsTrigger } from './components/ui/Tabs';
-import { QuizGenerationResult, RhetoricalGenerationResult } from './services/geminiService';
+import {
+  QuizGenerationResult,
+  RhetoricalGenerationResult,
+  generateMoreQuizQuestions,
+  generateMoreParagraph,
+  generateMoreRhetoricalQuizQuestions,
+  generateMoreRhetoricalPassage,
+} from './services/geminiService';
 import { useHasApiKey } from './hooks/useHasApiKey';
 import { VocabInput } from './components/VocabInput';
 import { RhetoricalInput } from './components/RhetoricalInput';
-import { RhetoricalFlashcards } from './components/RhetoricalFlashcards';
-import { RhetoricalQuiz } from './components/RhetoricalQuiz';
-import { RhetoricalSentenceGame } from './components/RhetoricalSentenceGame';
-import { RhetoricalPassagePractice } from './components/RhetoricalPassagePractice';
+import { ActiveRecallFlashcards, Card } from './components/ActiveRecallFlashcards';
+import { QuizModule, QuizQuestion as DualQuizQuestion } from './components/QuizModule';
+import { ParagraphReview, ParagraphReviewData, ParagraphSegment } from './components/ParagraphReview';
 import { PassageStudy } from './components/PassageStudy';
 import { AnalogyQuiz } from './components/AnalogyQuiz';
 import { HomeDashboard } from './components/HomeDashboard';
@@ -39,8 +40,8 @@ import { cancelGeneration } from './services/generationControl';
 import { useTheme } from './theme/ThemeProvider';
 
 type StudySubject = 'home' | 'vocab' | 'analogy' | 'rhetoric' | 'passage';
-type VocabLearningMode = 'input' | 'flashcards' | 'quiz' | 'matching' | 'paragraph';
-type RhetoricalLearningMode = 'input' | 'flashcards' | 'quiz' | 'sentence-game' | 'passage';
+type VocabLearningMode = 'input' | 'flashcards' | 'quiz' | 'paragraph';
+type RhetoricalLearningMode = 'input' | 'flashcards' | 'quiz' | 'paragraph';
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -79,9 +80,241 @@ function App() {
   const handleRhetoricalDataGenerated = (data: RhetoricalGenerationResult, termsList: string[]) => {
     setRhetoricalData(data);
     setRhetoricalTermsList(termsList);
-    setRhetoricalMode('sentence-game');
+    setRhetoricalMode('flashcards');
     setIsLoading(false);
   };
+
+  // -------------------------------------------------------------
+  // Data Adapters for Modern Active-Recall, Quiz, and Review Hub
+  // -------------------------------------------------------------
+  const vocabActiveCards: Card[] = useMemo(() => {
+    if (!vocabData?.flashcards) return [];
+    return vocabData.flashcards.map((f, idx) => {
+      let sentenceWithBlank = f.context || f.example;
+      if (f.example && f.word) {
+        const regex = new RegExp(`\\b${f.word}\\b`, 'gi');
+        if (regex.test(f.example)) {
+          sentenceWithBlank = f.example.replace(regex, '______');
+        }
+      }
+
+      return {
+        id: `vocab-${idx}-${f.word}`,
+        type: 'vocab' as const,
+        term: f.word,
+        definition: f.definition,
+        synonyms: f.synonyms,
+        antonyms: f.antonyms,
+        mnemonicTip: f.mnemonic || (f.synonyms ? `Synonyms: ${f.synonyms}` : undefined),
+        prompt: f.definition,
+        sentencePrompt: sentenceWithBlank
+          ? `Fill in the missing vocabulary word:\n"${sentenceWithBlank}"`
+          : `Provide the vocabulary word matching: "${f.definition}"`,
+        answer: `${f.word} — ${f.definition}${f.example ? `\n\nExample: "${f.example}"` : ''}`,
+        hint: f.mnemonic ? `Mnemonic: ${f.mnemonic}` : (f.synonyms ? `Synonyms: ${f.synonyms}` : undefined),
+      };
+    });
+  }, [vocabData]);
+
+  const vocabQuizQuestions: DualQuizQuestion[] = useMemo(() => {
+    if (!vocabData?.quiz) return [];
+    return vocabData.quiz.map((q, idx) => ({
+      id: `vocab-q-${idx}`,
+      type: 'vocab' as const,
+      mode: 'sentence' as const,
+      prompt: q.question,
+      options: q.options,
+      correctAnswer: q.options[q.correct] || q.word,
+    }));
+  }, [vocabData]);
+
+  const vocabParagraphReviewData: ParagraphReviewData | null = useMemo(() => {
+    if (!vocabData?.paragraph?.paragraph) return null;
+    const rawParagraph = vocabData.paragraph.paragraph;
+
+    const sentenceMatches = rawParagraph.match(/[^.!?]+[.!?]+(\s+|$)/g) || [rawParagraph];
+    const segments: ParagraphSegment[] = [];
+    const usedWords = new Set<string>();
+
+    sentenceMatches.forEach((sentence) => {
+      // Find all bold occurrences in this sentence
+      const allBolds = Array.from(sentence.matchAll(/\*\*(.*?)\*\*/g)).map((m) => m[1].trim());
+
+      if (allBolds.length === 1) {
+        // Exactly one bold word: replace it with ______
+        const targetWord = allBolds[0];
+        const cleanSentence = sentence.replace(/\*\*(.*?)\*\*/g, '______').trim();
+        segments.push({
+          id: `vocab-seg-${segments.length}`,
+          text: cleanSentence,
+          targetKey: targetWord,
+        });
+        usedWords.add(targetWord.toLowerCase());
+      } else if (allBolds.length > 1) {
+        // If a sentence has multiple bold words, create a segment for each bold word,
+        // but ONLY blank out that specific targetWord and keep the other bold words as normal text!
+        allBolds.forEach((targetWord) => {
+          let cleanSentence = sentence;
+          allBolds.forEach((w) => {
+            if (w.toLowerCase() === targetWord.toLowerCase()) {
+              cleanSentence = cleanSentence.replace(new RegExp(`\\*\\*${w}\\*\\*`, 'g'), '______');
+            } else {
+              cleanSentence = cleanSentence.replace(new RegExp(`\\*\\*${w}\\*\\*`, 'g'), w);
+            }
+          });
+          segments.push({
+            id: `vocab-seg-${segments.length}`,
+            text: cleanSentence.trim(),
+            targetKey: targetWord,
+          });
+          usedWords.add(targetWord.toLowerCase());
+        });
+      }
+    });
+
+    // Ensure all vocabulary words from the user's active list are covered with context sentences
+    if (vocabData.flashcards) {
+      vocabData.flashcards.forEach((f) => {
+        if (!usedWords.has(f.word.toLowerCase())) {
+          const sText = f.context || f.example;
+          if (sText) {
+            const regex = new RegExp(`\\b${f.word}\\b`, 'gi');
+            const blanked = sText.replace(regex, '______');
+            segments.push({
+              id: `vocab-seg-${segments.length}`,
+              text: blanked,
+              targetKey: f.word,
+            });
+            usedWords.add(f.word.toLowerCase());
+          }
+        }
+      });
+    }
+
+    if (segments.length === 0 && vocabularyList.length > 0) {
+      vocabularyList.forEach((w, idx) => {
+        segments.push({
+          id: `vocab-seg-${idx}`,
+          text: `The context clearly illustrates the meaning and application of the term ______ in this sentence.`,
+          targetKey: w,
+        });
+      });
+    }
+
+    const available = Array.from(
+      new Set([
+        ...segments.map((s) => s.targetKey),
+        ...vocabularyList,
+      ])
+    );
+
+    return {
+      title: 'Contextual Vocabulary Paragraph Practice',
+      type: 'vocab' as const,
+      segments,
+      availableTerms: available,
+    };
+  }, [vocabData, vocabularyList]);
+
+  // Handlers for in-module difficulty generation
+  const handleRegenerateVocabParagraph = async (diff: 'easy' | 'standard' | 'hard') => {
+    if (!vocabularyList || vocabularyList.length === 0) return;
+    const newParagraph = await generateMoreParagraph(
+      vocabularyList,
+      diff === 'standard' ? 'medium' : diff
+    );
+    if (newParagraph) {
+      setVocabData((prev) => (prev ? { ...prev, paragraph: newParagraph } : prev));
+    }
+  };
+
+  const handleRegenerateVocabQuiz = async (diff: 'easy' | 'standard' | 'hard') => {
+    if (!vocabularyList || vocabularyList.length === 0) return;
+    const newQuiz = await generateMoreQuizQuestions(
+      vocabularyList,
+      diff === 'standard' ? 'medium' : diff
+    );
+    if (newQuiz && newQuiz.length > 0) {
+      setVocabData((prev) => (prev ? { ...prev, quiz: newQuiz } : prev));
+    }
+  };
+
+  const handleRegenerateRhetoricalParagraph = async (diff: 'easy' | 'standard' | 'hard') => {
+    if (!rhetoricalTermsList || rhetoricalTermsList.length === 0) return;
+    const newPassage = await generateMoreRhetoricalPassage(
+      rhetoricalTermsList,
+      diff === 'standard' ? 'medium' : diff
+    );
+    if (newPassage) {
+      setRhetoricalData((prev) => (prev ? { ...prev, passage: newPassage } : prev));
+    }
+  };
+
+  const handleRegenerateRhetoricalQuiz = async (diff: 'easy' | 'standard' | 'hard') => {
+    if (!rhetoricalTermsList || rhetoricalTermsList.length === 0) return;
+    const newQuiz = await generateMoreRhetoricalQuizQuestions(
+      rhetoricalTermsList,
+      diff === 'standard' ? 'medium' : diff
+    );
+    if (newQuiz && newQuiz.length > 0) {
+      setRhetoricalData((prev) => (prev ? { ...prev, quiz: newQuiz } : prev));
+    }
+  };
+
+  const rhetoricalActiveCards: Card[] = useMemo(() => {
+    if (!rhetoricalData?.flashcards) return [];
+    return rhetoricalData.flashcards.map((f, idx) => ({
+      id: `rhetoric-${idx}-${f.term}`,
+      type: 'rhetorical' as const,
+      term: f.term,
+      definition: `${f.definition}\n\nRhetorical Effect: ${f.rhetoricalEffect}`,
+      mnemonicTip: f.mnemonic || (f.historicExample ? `Historic Example: "${f.historicExample}"` : undefined),
+      prompt: f.definition,
+      sentencePrompt: f.historicExample
+        ? `Historical Excerpt:\n"${f.historicExample}"\n\nWhich rhetorical device is deployed in this excerpt?`
+        : f.exampleSentence
+        ? `Passage Excerpt:\n"${f.exampleSentence}"\n\nIdentify the rhetorical move demonstrated above.`
+        : `Which rhetorical device is defined as: "${f.definition}"?`,
+      answer: `${f.term} — ${f.definition}\n\nRhetorical Function: ${f.rhetoricalEffect}`,
+      hint: f.mnemonic ? `Mnemonic: ${f.mnemonic}` : (f.etymology ? `Origin: ${f.etymology}` : undefined),
+    }));
+  }, [rhetoricalData]);
+
+  const rhetoricalQuizQuestions: DualQuizQuestion[] = useMemo(() => {
+    if (!rhetoricalData?.quiz) return [];
+    return rhetoricalData.quiz.map((q, idx) => ({
+      id: `rhetoric-q-${idx}`,
+      type: 'rhetorical' as const,
+      mode: (q.question.toLowerCase().includes('definition') ? 'definition' : 'sentence') as 'definition' | 'sentence',
+      prompt: q.question,
+      options: q.options,
+      correctAnswer: q.options[q.correct] || q.term,
+    }));
+  }, [rhetoricalData]);
+
+  const rhetoricalParagraphReviewData: ParagraphReviewData | null = useMemo(() => {
+    if (!rhetoricalData) return null;
+
+    const segments: ParagraphSegment[] = (rhetoricalData.sentenceMatches || []).map((item, idx) => ({
+      id: `rhet-seg-${idx}`,
+      text: item.targetSentence || item.explanation,
+      targetKey: item.term,
+    }));
+
+    const available = Array.from(
+      new Set([
+        ...segments.map((s) => s.targetKey),
+        ...rhetoricalTermsList,
+      ])
+    );
+
+    return {
+      title: 'AP Lang Rhetorical Strategy Context Mapping',
+      type: 'rhetorical' as const,
+      segments,
+      availableTerms: available,
+    };
+  }, [rhetoricalData, rhetoricalTermsList]);
 
   if (showSplash) {
     return <SplashScreen onComplete={() => setShowSplash(false)} />;
@@ -317,7 +550,7 @@ function App() {
                   <GenerationProgress
                     theme="rhetoric"
                     title="Building your rhetoric packet"
-                    steps={['Reading your rhetorical terms', 'Writing flashcards', 'Building the sentence game', 'Writing the AP-style quiz']}
+                    steps={['Reading your rhetorical terms', 'Writing flashcards', 'Writing quiz questions', 'Building context review']}
                     expectedSeconds={25}
                     onCancel={cancelGeneration}
                   />
@@ -325,7 +558,7 @@ function App() {
                   <GenerationProgress
                     theme="vocab"
                     title="Building your study set"
-                    steps={['Reading your vocabulary list', 'Writing flashcards', 'Writing quiz questions', 'Pairing matching terms', 'Writing the practice paragraph']}
+                    steps={['Reading your vocabulary list', 'Writing flashcards', 'Writing quiz questions', 'Building the practice paragraph']}
                     expectedSeconds={25}
                     onCancel={cancelGeneration}
                   />
@@ -350,13 +583,17 @@ function App() {
             {/* ========================================================= */}
             {isVocab && (
               <>
-                {hasVocabContent && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 max-w-3xl mx-auto w-full">
+                {hasVocabContent && vocabMode !== 'input' && (
+                  <div
+                    className={`flex flex-col sm:flex-row items-center justify-between gap-4 mx-auto w-full transition-all duration-300 ${
+                      vocabMode === 'paragraph' ? 'max-w-5xl' : 'max-w-3xl'
+                    }`}
+                  >
                     <Tabs className="w-full">
                       <TabsList
                         value={vocabMode}
                         onChange={(_: any, value: any) => setVocabMode(value as VocabLearningMode)}
-                        className="grid w-full grid-cols-4 rounded-2xl bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-white/[0.08] p-1"
+                        className="grid w-full grid-cols-3 rounded-2xl bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-white/[0.08] p-1"
                       >
                         <TabsTrigger value="flashcards" className="gap-2 text-xs font-semibold">
                           <BookOpen className="h-3.5 w-3.5" /> Flashcards
@@ -364,11 +601,8 @@ function App() {
                         <TabsTrigger value="quiz" className="gap-2 text-xs font-semibold">
                           <Brain className="h-3.5 w-3.5" /> Quiz
                         </TabsTrigger>
-                        <TabsTrigger value="matching" className="gap-2 text-xs font-semibold">
-                          <Grid3X3 className="h-3.5 w-3.5" /> Games
-                        </TabsTrigger>
                         <TabsTrigger value="paragraph" className="gap-2 text-xs font-semibold">
-                          <FileText className="h-3.5 w-3.5" /> Context
+                          <FileText className="h-3.5 w-3.5" /> Paragraph Review
                         </TabsTrigger>
                       </TabsList>
                     </Tabs>
@@ -392,21 +626,20 @@ function App() {
                   )}
 
                   {vocabMode === 'flashcards' && vocabData ? (
-                    <Flashcards flashcards={vocabData.flashcards} />
+                    <ActiveRecallFlashcards cards={vocabActiveCards} />
                   ) : null}
 
                   {vocabMode === 'quiz' && vocabData ? (
-                    <Quiz questions={vocabData.quiz} vocabularyWords={vocabularyList} />
+                    <QuizModule
+                      questions={vocabQuizQuestions}
+                      onRegenerateDifficulty={handleRegenerateVocabQuiz}
+                    />
                   ) : null}
 
-                  {vocabMode === 'matching' && vocabData ? (
-                    <GameArea flashcards={vocabData.flashcards} />
-                  ) : null}
-
-                  {vocabMode === 'paragraph' && vocabData ? (
-                    <ParagraphPractice
-                      paragraphData={vocabData.paragraph}
-                      vocabularyWords={vocabularyList}
+                  {vocabMode === 'paragraph' && vocabData && vocabParagraphReviewData ? (
+                    <ParagraphReview
+                      data={vocabParagraphReviewData}
+                      onRegenerateDifficulty={handleRegenerateVocabParagraph}
                     />
                   ) : null}
                 </div>
@@ -432,27 +665,28 @@ function App() {
             {/* ========================================================= */}
             {isRhetoric && (
               <>
-                {hasRhetoricalContent && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 max-w-4xl mx-auto w-full">
+                {hasRhetoricalContent && rhetoricalMode !== 'input' && (
+                  <div
+                    className={`flex flex-col sm:flex-row items-center justify-between gap-4 mx-auto w-full transition-all duration-300 ${
+                      rhetoricalMode === 'paragraph' ? 'max-w-5xl' : 'max-w-3xl'
+                    }`}
+                  >
                     <Tabs className="w-full">
                       <TabsList
                         value={rhetoricalMode}
                         onChange={(_: any, value: any) =>
                           setRhetoricalMode(value as RhetoricalLearningMode)
                         }
-                        className="grid w-full grid-cols-4 rounded-2xl bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-white/[0.08] p-1"
+                        className="grid w-full grid-cols-3 rounded-2xl bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-white/[0.08] p-1"
                       >
-                        <TabsTrigger value="sentence-game" className="gap-2 text-xs font-semibold">
-                          <Target className="h-3.5 w-3.5 text-emerald-500" /> Sentence Guess
-                        </TabsTrigger>
                         <TabsTrigger value="flashcards" className="gap-2 text-xs font-semibold">
                           <BookOpen className="h-3.5 w-3.5" /> Flashcards
                         </TabsTrigger>
                         <TabsTrigger value="quiz" className="gap-2 text-xs font-semibold">
                           <Brain className="h-3.5 w-3.5" /> Quiz
                         </TabsTrigger>
-                        <TabsTrigger value="passage" className="gap-2 text-xs font-semibold">
-                          <Feather className="h-3.5 w-3.5" /> Passage
+                        <TabsTrigger value="paragraph" className="gap-2 text-xs font-semibold">
+                          <FileText className="h-3.5 w-3.5" /> Context Review
                         </TabsTrigger>
                       </TabsList>
                     </Tabs>
@@ -475,29 +709,21 @@ function App() {
                     />
                   )}
 
-                  {rhetoricalMode === 'sentence-game' && rhetoricalData ? (
-                    <RhetoricalSentenceGame
-                      sentenceMatches={rhetoricalData.sentenceMatches}
-                      rhetoricalTerms={rhetoricalTermsList}
-                      onBackToMenu={() => setRhetoricalMode('input')}
-                    />
-                  ) : null}
-
                   {rhetoricalMode === 'flashcards' && rhetoricalData ? (
-                    <RhetoricalFlashcards flashcards={rhetoricalData.flashcards} />
+                    <ActiveRecallFlashcards cards={rhetoricalActiveCards} />
                   ) : null}
 
                   {rhetoricalMode === 'quiz' && rhetoricalData ? (
-                    <RhetoricalQuiz
-                      questions={rhetoricalData.quiz}
-                      rhetoricalTerms={rhetoricalTermsList}
+                    <QuizModule
+                      questions={rhetoricalQuizQuestions}
+                      onRegenerateDifficulty={handleRegenerateRhetoricalQuiz}
                     />
                   ) : null}
 
-                  {rhetoricalMode === 'passage' && rhetoricalData ? (
-                    <RhetoricalPassagePractice
-                      passageData={rhetoricalData.passage}
-                      rhetoricalTerms={rhetoricalTermsList}
+                  {rhetoricalMode === 'paragraph' && rhetoricalData && rhetoricalParagraphReviewData ? (
+                    <ParagraphReview
+                      data={rhetoricalParagraphReviewData}
+                      onRegenerateDifficulty={handleRegenerateRhetoricalParagraph}
                     />
                   ) : null}
                 </div>

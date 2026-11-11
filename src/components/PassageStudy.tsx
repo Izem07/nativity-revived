@@ -227,9 +227,10 @@ export function PassageStudy({
   }
 
   // ---------- Test & Results ----------
-  const total = test.questions.length;
+  const total = test.questions.length || 1;
   const answeredCount = Object.keys(answers).length;
   const score = test.questions.filter((q, i) => answers[i] === q.correctIndex).length;
+  const accuracy = Math.min(100, Math.max(0, Math.round((score / total) * 100)));
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6">
@@ -242,7 +243,7 @@ export function PassageStudy({
             </div>
             <div>
               <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                {Math.round((score / total) * 100)}% correct
+                {accuracy}% Accuracy ({accuracy}/100)
               </p>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">Explanations are shown under each question.</p>
             </div>

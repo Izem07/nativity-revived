@@ -35,7 +35,7 @@ const SECTIONS: {
   {
     id: 'vocab',
     title: 'Vocabulary',
-    description: 'Turn your word list into flashcards, quizzes, matching games and a practice paragraph.',
+    description: 'Turn your word list into active-recall flashcards, quizzes, and paragraph review.',
     icon: BookOpen,
     tile: 'bg-brand-500/10 border-brand-500/25 text-brand-600 dark:text-brand-400',
     hover: 'hover:border-brand-500/50',
@@ -53,7 +53,7 @@ const SECTIONS: {
   {
     id: 'rhetoric',
     title: 'Rhetorical Terms',
-    description: 'Learn devices with flashcards, a sentence-guessing game and AP-style quizzes.',
+    description: 'Master devices with active-recall flashcards, quizzes, and contextual review.',
     icon: Feather,
     tile: 'bg-emerald-500/10 border-emerald-500/25 text-emerald-600 dark:text-emerald-400',
     hover: 'hover:border-emerald-500/50',

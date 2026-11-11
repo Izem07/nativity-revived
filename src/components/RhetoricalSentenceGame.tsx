@@ -220,13 +220,14 @@ function GuessSentenceChallenge({ items }: { items: RhetoricalSentenceItem[] }) 
 
   // Completion Screen
   if (isCompleted) {
-    const accuracy = Math.round((score / shuffledItems.length) * 100);
+    const totalItems = shuffledItems.length || 1;
+    const accuracy = Math.min(100, Math.max(0, Math.round((score / totalItems) * 100)));
     let title = 'Rhetorical Apprentice';
     let badgeColor = 'from-teal-400 to-emerald-500';
-    if (accuracy >= 90) {
+    if (accuracy >= 95) {
       title = 'AP Lang Rhetorical Virtuoso';
       badgeColor = 'from-amber-400 to-yellow-500';
-    } else if (accuracy >= 75) {
+    } else if (accuracy >= 80) {
       title = 'Master Rhetorician';
       badgeColor = 'from-emerald-400 to-teal-400';
     }
@@ -247,18 +248,18 @@ function GuessSentenceChallenge({ items }: { items: RhetoricalSentenceItem[] }) 
           </Badge>
           <h2 className="text-3xl font-extrabold text-white">Challenge Completed!</h2>
           <p className="text-slate-400 max-w-md mx-auto text-sm">
-            You tested your rhetorical identification across {shuffledItems.length} rhetorical devices.
+            You tested your rhetorical identification across {shuffledItems.length} rhetorical devices with {accuracy}% accuracy.
           </p>
         </div>
 
         <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto">
           <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5">
-            <div className="text-2xl font-bold text-emerald-400">{score.toFixed(1)}</div>
+            <div className="text-2xl font-bold text-emerald-400">{score.toFixed(1)} / {shuffledItems.length}</div>
             <div className="text-xs text-slate-400">Total Score</div>
           </div>
           <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5">
             <div className="text-2xl font-bold text-teal-400">{accuracy}%</div>
-            <div className="text-xs text-slate-400">Accuracy</div>
+            <div className="text-xs text-slate-400">Accuracy (100 Scale)</div>
           </div>
           <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5">
             <div className="text-2xl font-bold text-amber-400 flex items-center justify-center gap-1">
