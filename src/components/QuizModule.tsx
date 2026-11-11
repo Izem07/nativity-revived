@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Brain,
@@ -44,6 +44,22 @@ export const QuizModule: React.FC<QuizModuleProps> = ({
   // Difficulty Mode
   const [difficulty, setDifficulty] = useState<'easy' | 'standard' | 'hard'>('standard');
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [regenProgress, setRegenProgress] = useState(15);
+
+  useEffect(() => {
+    if (!isRegenerating) {
+      setRegenProgress(15);
+      return;
+    }
+    const timer = setInterval(() => {
+      setRegenProgress((prev) => {
+        if (prev >= 92) return prev;
+        const diff = 95 - prev;
+        return prev + Math.max(1, Math.round(diff * 0.12));
+      });
+    }, 140);
+    return () => clearInterval(timer);
+  }, [isRegenerating]);
 
   const handleRestart = () => {
     setCurrentIndex(0);
@@ -228,6 +244,32 @@ export const QuizModule: React.FC<QuizModuleProps> = ({
           </span>
         </div>
       </div>
+
+      {/* Regeneration Progress Bar */}
+      {isRegenerating && (
+        <div className="p-4 sm:p-5 mb-5 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-white/[0.08] shadow-md space-y-3 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <Sparkles className={`h-4 w-4 animate-spin ${accentText}`} />
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                Regenerating {difficulty.toUpperCase()} Quiz Questions...
+              </span>
+            </div>
+            <span className={`font-mono font-bold ${accentText}`}>{regenProgress}%</span>
+          </div>
+          <div className="w-full h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+            <div
+              className={`h-full rounded-full bg-gradient-to-r ${
+                isRhetoric ? 'from-emerald-500 to-teal-400' : 'from-brand-500 to-sky-400'
+              } transition-all duration-200 ease-out`}
+              style={{ width: `${regenProgress}%` }}
+            />
+          </div>
+          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+            Formulating challenging AP-tier multiple choice questions with calibrated distractors...
+          </p>
+        </div>
+      )}
 
       {/* Question Card */}
       <AnimatePresence mode="wait">

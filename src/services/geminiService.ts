@@ -183,8 +183,12 @@ export const generateMoreQuizQuestions = async (
   difficulty: 'easy' | 'standard' | 'medium' | 'hard' | 'custom' = 'standard',
   customTopic: string = ''
 ): Promise<QuizQuestion[]> => {
-  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
-    const model = genAI.getGenerativeModel({ model: fallbackModel || 'gemini-3.8-flash' });
+  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
+    const modelName = fallbackModel || 'gemini-3.8-flash';
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: { responseMimeType: 'application/json', ...speedConfig(modelName) }
+    });
     const vocabString = vocabularyList.join(', ');
 
     let difficultyInstruction = '';
@@ -218,7 +222,7 @@ export const generateMoreQuizQuestions = async (
       ]
     }`;
 
-    const quizResult = await model.generateContent(quizPrompt);
+    const quizResult = await model.generateContent(quizPrompt, { signal });
     const quizData = extractAndParseJson(quizResult.response.text());
     return quizData.questions || [];
   });
@@ -229,8 +233,12 @@ export const generateMoreParagraph = async (
   difficulty: 'easy' | 'standard' | 'medium' | 'hard' | 'custom' = 'standard',
   customTopic: string = ''
 ): Promise<ParagraphData> => {
-  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
-    const model = genAI.getGenerativeModel({ model: fallbackModel || 'gemini-3.8-flash' });
+  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
+    const modelName = fallbackModel || 'gemini-3.8-flash';
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: { responseMimeType: 'application/json', ...speedConfig(modelName) }
+    });
     const vocabString = vocabularyList.join(', ');
 
     let difficultyInstruction = '';
@@ -254,7 +262,7 @@ export const generateMoreParagraph = async (
     1. The passage MUST read as a single, connected, flowing narrative or persuasive argument—NOT disconnected sentences. Ensure smooth, natural transitions between consecutive sentences.
     2. EACH sentence containing a vocabulary word MUST contain EXACTLY ONE target vocabulary word marked in **bold** (e.g. **word**). Never put multiple target vocabulary words in the same sentence.
     3. The context must meaningfully challenge the reader: embed rich rhetorical context clues and tone so the word choice is logical and verifiable through careful analytical reading.
-    4. Create 3-4 comprehension questions about the paragraph.
+    4. Provide 2 brief comprehension questions about the paragraph.
     
     Format your response as JSON with this structure:
     {
@@ -267,7 +275,7 @@ export const generateMoreParagraph = async (
       ]
     }`;
 
-    const paragraphResult = await model.generateContent(paragraphPrompt);
+    const paragraphResult = await model.generateContent(paragraphPrompt, { signal });
     return extractAndParseJson(paragraphResult.response.text());
   });
 };
@@ -479,8 +487,12 @@ export const generateMoreRhetoricalQuizQuestions = async (
   difficulty: 'easy' | 'standard' | 'medium' | 'hard' | 'custom' = 'standard',
   customTopic: string = ''
 ): Promise<RhetoricalQuizQuestion[]> => {
-  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
-    const model = genAI.getGenerativeModel({ model: fallbackModel || 'gemini-3.8-flash' });
+  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
+    const modelName = fallbackModel || 'gemini-3.8-flash';
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: { responseMimeType: 'application/json', ...speedConfig(modelName) }
+    });
     const termsString = termsList.join(', ');
 
     let instruction = '';
@@ -510,7 +522,7 @@ export const generateMoreRhetoricalQuizQuestions = async (
       ]
     }`;
 
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(prompt, { signal });
     const data = extractAndParseJson(result.response.text());
     return data.questions || [];
   });
@@ -521,14 +533,18 @@ export const generateMoreRhetoricalPassage = async (
   difficulty: 'easy' | 'standard' | 'medium' | 'hard' | 'custom' = 'standard',
   customTopic: string = ''
 ): Promise<RhetoricalPassageData> => {
-  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
-    const model = genAI.getGenerativeModel({ model: fallbackModel || 'gemini-3.8-flash' });
+  return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
+    const modelName = fallbackModel || 'gemini-3.8-flash';
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: { responseMimeType: 'application/json', ...speedConfig(modelName) }
+    });
     const termsString = termsList.join(', ');
 
     let theme = customTopic ? `on the theme of ${customTopic}` : 'addressing a pressing civic or ethical dilemma';
     const prompt = `Write an eloquent AP Lang style speech or essay excerpt (175-250 words) ${theme} that incorporates these rhetorical devices: ${termsString}.
     Bold the devices when used like **[Device: excerpt]** or **excerpt (Device)**.
-    Include 3-4 AP Lang rhetorical analysis questions with model answers.
+    Include 2 brief AP Lang rhetorical analysis questions with model answers.
     
     Format as JSON:
     {
@@ -542,7 +558,7 @@ export const generateMoreRhetoricalPassage = async (
       ]
     }`;
 
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(prompt, { signal });
     return extractAndParseJson(result.response.text());
   });
 };

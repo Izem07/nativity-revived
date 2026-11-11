@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   RotateCcw,
@@ -54,6 +54,22 @@ export const ParagraphReview: React.FC<ParagraphReviewProps> = ({
   // Difficulty Mode
   const [difficulty, setDifficulty] = useState<'easy' | 'standard' | 'hard'>('standard');
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [regenProgress, setRegenProgress] = useState(15);
+
+  useEffect(() => {
+    if (!isRegenerating) {
+      setRegenProgress(15);
+      return;
+    }
+    const timer = setInterval(() => {
+      setRegenProgress((prev) => {
+        if (prev >= 92) return prev;
+        const diff = 95 - prev;
+        return prev + Math.max(1, Math.round(diff * 0.12));
+      });
+    }, 140);
+    return () => clearInterval(timer);
+  }, [isRegenerating]);
 
   const segments = data?.segments || [];
   const totalPages = Math.max(1, Math.ceil(segments.length / PAGE_SIZE));
@@ -68,43 +84,52 @@ export const ParagraphReview: React.FC<ParagraphReviewProps> = ({
   // Check if current page is submitted
   const isCurrentPageSubmitted = Boolean(submittedPages[currentPageIndex]);
 
-  // Words used in PREVIOUS completed pages
-  const previouslyUsedTerms = useMemo(() => {
+  // Words that were the right answer on previous pages (sections)
+  // Ensures previous right answers never appear in subsequent word banks
+  const previousSectionsRightAnswers = useMemo(() => {
     const used = new Set<string>();
-    for (let p = 0; p < totalPages; p++) {
-      if (p !== currentPageIndex && submittedPages[p]) {
-        const pageSegs = segments.slice(p * PAGE_SIZE, (p + 1) * PAGE_SIZE);
-        pageSegs.forEach((seg) => {
-          if (userMatches[seg.id]) {
-            used.add(userMatches[seg.id].trim().toLowerCase());
-          }
-        });
-      }
+    for (let p = 0; p < currentPageIndex; p++) {
+      const pageSegs = segments.slice(p * PAGE_SIZE, (p + 1) * PAGE_SIZE);
+      pageSegs.forEach((seg) => {
+        if (seg.targetKey && seg.targetKey.trim()) {
+          used.add(seg.targetKey.trim().toLowerCase());
+        }
+      });
     }
     return used;
-  }, [submittedPages, currentPageIndex, totalPages, segments, userMatches]);
+  }, [currentPageIndex, segments]);
 
-  // Target terms for this page
+  // Target terms for this page (unique matching words for current page blanks)
   const currentPageTargetKeys = useMemo(() => {
-    return currentPageSegments.map((s) => s.targetKey);
+    const keys = new Set<string>();
+    currentPageSegments.forEach((s) => {
+      if (s.targetKey && s.targetKey.trim()) {
+        keys.add(s.targetKey.trim());
+      }
+    });
+    return Array.from(keys);
   }, [currentPageSegments]);
 
   // Available words for this page:
-  // Shows current page target terms, plus any terms from availableTerms that haven't been completed on previous pages
+  // - Easy & Standard: ONLY shows the possible words for this page (max 6 matches, so only 6 words can be there)
+  // - Hard: all remaining words are shown, excluding previous sections' right answers
   const displayTerms = useMemo(() => {
+    if (difficulty === 'easy' || difficulty === 'standard') {
+      return [...currentPageTargetKeys].sort((a, b) => a.localeCompare(b));
+    }
+
     const pool = new Set<string>();
-    // Add all target keys for this page
     currentPageTargetKeys.forEach((k) => pool.add(k));
 
-    // Add remaining words from availableTerms that weren't completed on previous pages
     (data.availableTerms || []).forEach((t) => {
-      if (!previouslyUsedTerms.has(t.trim().toLowerCase())) {
-        pool.add(t);
+      const clean = t.trim();
+      if (clean && !previousSectionsRightAnswers.has(clean.toLowerCase())) {
+        pool.add(clean);
       }
     });
 
-    return Array.from(pool);
-  }, [currentPageTargetKeys, data.availableTerms, previouslyUsedTerms]);
+    return Array.from(pool).sort((a, b) => a.localeCompare(b));
+  }, [difficulty, currentPageTargetKeys, data.availableTerms, previousSectionsRightAnswers]);
 
   if (!data || !data.segments || data.segments.length === 0) {
     return (
@@ -303,13 +328,13 @@ export const ParagraphReview: React.FC<ParagraphReviewProps> = ({
               ) : (
                 <BookOpen className="h-3 w-3 text-brand-500" />
               )}
-              {isRhetoric ? 'Rhetorical Context Review' : 'Vocabulary Context Review'}
+              {isRhetoric ? 'RHETORICAL PARAGRAPH REVIEW' : 'VOCABULARY PARAGRAPH REVIEW'}
             </span>
             <span className="text-xs text-zinc-400 font-mono">
               Part {currentPageIndex + 1} of {totalPages}
             </span>
           </div>
-          <h2 className={`text-xl sm:text-2xl font-bold mt-1.5 ${accentText}`}>{data.title}</h2>
+          <h2 className={`text-xl sm:text-2xl font-bold mt-1.5 ${accentText}`}>{data.title || 'PARAGRAPH REVIEW'}</h2>
         </div>
 
         {/* Difficulty Controls & Generation */}
@@ -357,6 +382,32 @@ export const ParagraphReview: React.FC<ParagraphReviewProps> = ({
         </div>
       </div>
 
+      {/* Regeneration Progress Bar */}
+      {isRegenerating && (
+        <div className="p-5 mb-5 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-white/[0.08] shadow-md space-y-3 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2.5">
+              <Sparkles className={`h-4 w-4 animate-spin ${accentText}`} />
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                Regenerating {difficulty.toUpperCase()} PARAGRAPH REVIEW...
+              </span>
+            </div>
+            <span className={`font-mono font-bold ${accentText}`}>{regenProgress}%</span>
+          </div>
+          <div className="w-full h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+            <div
+              className={`h-full rounded-full bg-gradient-to-r ${
+                isRhetoric ? 'from-emerald-500 to-teal-400' : 'from-brand-500 to-sky-400'
+              } transition-all duration-200 ease-out`}
+              style={{ width: `${regenProgress}%` }}
+            />
+          </div>
+          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+            AI is formulating fresh, continuous prose with {difficulty} difficulty and zero repeat answers...
+          </p>
+        </div>
+      )}
+
       {/* Progress & Pagination Bar */}
       <div className="flex items-center justify-between mb-4 px-1">
         <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
@@ -400,28 +451,32 @@ export const ParagraphReview: React.FC<ParagraphReviewProps> = ({
         <div className="flex flex-wrap gap-2">
           {displayTerms.map((term) => {
             const isSelected = selectedTerm === term;
-            // Count times placed on CURRENT page
+            // Check if placed in ANY blank on the current page
             const timesUsedOnThisPage = currentPageSegments.filter(
               (seg) => userMatches[seg.id]?.trim().toLowerCase() === term.trim().toLowerCase()
             ).length;
+            const isPlacedOnCurrentPage = timesUsedOnThisPage > 0;
 
             return (
               <button
                 key={term}
                 type="button"
-                onClick={() => setSelectedTerm(isSelected ? null : term)}
-                disabled={isCurrentPageSubmitted}
-                className={`px-3 py-1.5 border rounded-xl text-xs font-semibold transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer ${
+                onClick={() => {
+                  if (isPlacedOnCurrentPage) return;
+                  setSelectedTerm(isSelected ? null : term);
+                }}
+                disabled={isCurrentPageSubmitted || isPlacedOnCurrentPage}
+                className={`px-3 py-1.5 border rounded-xl text-xs font-semibold transition-all inline-flex items-center gap-1.5 shadow-sm ${
                   isSelected
                     ? `${accentBg} text-white border-transparent shadow-md scale-105 ring-2 ring-brand-500/30`
-                    : timesUsedOnThisPage > 0
-                    ? 'bg-zinc-100 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-700 text-zinc-400 dark:text-zinc-500 line-through'
-                    : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 hover:border-zinc-400 dark:hover:border-zinc-600 hover:scale-[1.02]'
+                    : isPlacedOnCurrentPage
+                    ? 'bg-zinc-100 dark:bg-zinc-850/60 border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-600 line-through opacity-50 cursor-not-allowed'
+                    : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 hover:border-zinc-400 dark:hover:border-zinc-600 hover:scale-[1.02] cursor-pointer'
                 }`}
               >
                 <span>{term}</span>
-                {timesUsedOnThisPage > 0 && !isSelected && (
-                  <span className="text-[10px] px-1 py-0.2 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 no-underline">
+                {isPlacedOnCurrentPage && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 no-underline font-normal">
                     Placed
                   </span>
                 )}

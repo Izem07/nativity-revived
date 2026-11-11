@@ -209,7 +209,7 @@ function App() {
     );
 
     return {
-      title: 'Contextual Vocabulary Paragraph Practice',
+      title: 'PARAGRAPH REVIEW',
       type: 'vocab' as const,
       segments,
       availableTerms: available,
@@ -309,7 +309,7 @@ function App() {
     );
 
     return {
-      title: 'AP Lang Rhetorical Strategy Context Mapping',
+      title: 'PARAGRAPH REVIEW',
       type: 'rhetorical' as const,
       segments,
       availableTerms: available,
@@ -602,7 +602,7 @@ function App() {
                           <Brain className="h-3.5 w-3.5" /> Quiz
                         </TabsTrigger>
                         <TabsTrigger value="paragraph" className="gap-2 text-xs font-semibold">
-                          <FileText className="h-3.5 w-3.5" /> Paragraph Review
+                          <FileText className="h-3.5 w-3.5" /> PARAGRAPH REVIEW
                         </TabsTrigger>
                       </TabsList>
                     </Tabs>
@@ -686,7 +686,7 @@ function App() {
                           <Brain className="h-3.5 w-3.5" /> Quiz
                         </TabsTrigger>
                         <TabsTrigger value="paragraph" className="gap-2 text-xs font-semibold">
-                          <FileText className="h-3.5 w-3.5" /> Context Review
+                          <FileText className="h-3.5 w-3.5" /> PARAGRAPH REVIEW
                         </TabsTrigger>
                       </TabsList>
                     </Tabs>
