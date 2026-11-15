@@ -3,7 +3,7 @@ import { FlashcardItem } from '../components/Flashcards';
 import { MatchingPair } from '../components/Matching';
 import { ParagraphData } from '../components/ParagraphPractice';
 import { QuizQuestion } from '../components/Quiz';
-import { globalKeyPool, speedConfig } from './keyPoolService';
+import { globalKeyPool, speedConfig, getTierGenerationConfig } from './keyPoolService';
 
 export const getStoredAPIKey = (): string => {
   const storedKey = localStorage.getItem('GEMINI_API_KEY');
@@ -53,11 +53,11 @@ export const generateQuizContent = async (
   difficulty: 'easy' | 'standard' | 'hard' = 'standard'
 ): Promise<QuizGenerationResult> => {
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
-    const modelName = fallbackModel || 'gemini-3.8-flash';
+    const modelName = fallbackModel || 'gemini-3.5-flash-lite';
     const model = genAI.getGenerativeModel({
       model: modelName,
       // JSON mode avoids malformed replies; lower thinking answers sooner and temperature provides high factual accuracy
-      generationConfig: { responseMimeType: 'application/json', ...speedConfig(modelName) }
+      generationConfig: getTierGenerationConfig(modelName, { responseMimeType: 'application/json' })
     });
     const vocabString = vocabularyList.join(', ');
 
@@ -128,7 +128,7 @@ Format response strictly as JSON with this structure:
       matching: data.pairs || data.matching || [],
       paragraph: data.paragraph || { paragraph: '', questions: [] }
     };
-  });
+  }, { tier: 'medium' });
 };
 
 // Checks a key by listing models instead of generating content: no quota used, no model load
@@ -184,10 +184,10 @@ export const generateMoreQuizQuestions = async (
   customTopic: string = ''
 ): Promise<QuizQuestion[]> => {
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
-    const modelName = fallbackModel || 'gemini-3.8-flash';
+    const modelName = fallbackModel || 'gemini-3.5-flash-lite';
     const model = genAI.getGenerativeModel({
       model: modelName,
-      generationConfig: { responseMimeType: 'application/json', ...speedConfig(modelName) }
+      generationConfig: getTierGenerationConfig(modelName, { responseMimeType: 'application/json' })
     });
     const vocabString = vocabularyList.join(', ');
 
@@ -225,7 +225,7 @@ export const generateMoreQuizQuestions = async (
     const quizResult = await model.generateContent(quizPrompt, { signal });
     const quizData = extractAndParseJson(quizResult.response.text());
     return quizData.questions || [];
-  });
+  }, { tier: 'medium' });
 };
 
 export const generateMoreParagraph = async (
@@ -234,10 +234,10 @@ export const generateMoreParagraph = async (
   customTopic: string = ''
 ): Promise<ParagraphData> => {
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
-    const modelName = fallbackModel || 'gemini-3.8-flash';
+    const modelName = fallbackModel || 'gemini-3.5-flash-lite';
     const model = genAI.getGenerativeModel({
       model: modelName,
-      generationConfig: { responseMimeType: 'application/json', ...speedConfig(modelName) }
+      generationConfig: getTierGenerationConfig(modelName, { responseMimeType: 'application/json' })
     });
     const vocabString = vocabularyList.join(', ');
 
@@ -277,7 +277,7 @@ export const generateMoreParagraph = async (
 
     const paragraphResult = await model.generateContent(paragraphPrompt, { signal });
     return extractAndParseJson(paragraphResult.response.text());
-  });
+  }, { tier: 'medium' });
 };
 
 export const generateHangmanWords = async (
@@ -286,7 +286,15 @@ export const generateHangmanWords = async (
   difficulty: 'easy' | 'medium' | 'hard' | 'custom'
 ): Promise<FlashcardItem[]> => {
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
-    const model = genAI.getGenerativeModel({ model: fallbackModel || 'gemini-3.8-flash' });
+    const modelName = fallbackModel || 'gemma-4-31b-it';
+    const isGemma = modelName.toLowerCase().startsWith('gemma');
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: getTierGenerationConfig(modelName, {
+        temperature: 0.7,
+        ...(isGemma ? {} : { responseMimeType: 'application/json' })
+      })
+    });
 
     let prompt = '';
     if (difficulty === 'custom') {
@@ -335,7 +343,7 @@ export const generateHangmanWords = async (
       etymology: '',
       example: ''
     }));
-  });
+  }, { tier: 'fast' });
 };
 
 // ==========================================
@@ -396,11 +404,11 @@ export const generateRhetoricalContent = async (
   difficulty: 'easy' | 'standard' | 'hard' = 'standard'
 ): Promise<RhetoricalGenerationResult> => {
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
-    const modelName = fallbackModel || 'gemini-3.8-flash';
+    const modelName = fallbackModel || 'gemini-4-hydrogen';
     const model = genAI.getGenerativeModel({
       model: modelName,
       // JSON mode avoids malformed replies; lower thinking answers sooner and temperature provides high factual accuracy
-      generationConfig: { responseMimeType: 'application/json', ...speedConfig(modelName) }
+      generationConfig: getTierGenerationConfig(modelName, { responseMimeType: 'application/json' })
     });
     const termsString = termsList.join(', ');
 
@@ -479,7 +487,7 @@ Format response strictly as JSON with this structure:
       quiz: data.questions || data.quiz || [],
       passage: data.passage || { passage: '', questions: [] }
     };
-  });
+  }, { tier: 'heavy' });
 };
 
 export const generateMoreRhetoricalQuizQuestions = async (
@@ -488,10 +496,10 @@ export const generateMoreRhetoricalQuizQuestions = async (
   customTopic: string = ''
 ): Promise<RhetoricalQuizQuestion[]> => {
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
-    const modelName = fallbackModel || 'gemini-3.8-flash';
+    const modelName = fallbackModel || 'gemini-3.5-flash-lite';
     const model = genAI.getGenerativeModel({
       model: modelName,
-      generationConfig: { responseMimeType: 'application/json', ...speedConfig(modelName) }
+      generationConfig: getTierGenerationConfig(modelName, { responseMimeType: 'application/json' })
     });
     const termsString = termsList.join(', ');
 
@@ -525,7 +533,7 @@ export const generateMoreRhetoricalQuizQuestions = async (
     const result = await model.generateContent(prompt, { signal });
     const data = extractAndParseJson(result.response.text());
     return data.questions || [];
-  });
+  }, { tier: 'medium' });
 };
 
 export const generateMoreRhetoricalPassage = async (
@@ -534,10 +542,10 @@ export const generateMoreRhetoricalPassage = async (
   customTopic: string = ''
 ): Promise<RhetoricalPassageData> => {
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
-    const modelName = fallbackModel || 'gemini-3.8-flash';
+    const modelName = fallbackModel || 'gemini-4-hydrogen';
     const model = genAI.getGenerativeModel({
       model: modelName,
-      generationConfig: { responseMimeType: 'application/json', ...speedConfig(modelName) }
+      generationConfig: getTierGenerationConfig(modelName, { responseMimeType: 'application/json' })
     });
     const termsString = termsList.join(', ');
 
@@ -560,5 +568,5 @@ export const generateMoreRhetoricalPassage = async (
 
     const result = await model.generateContent(prompt, { signal });
     return extractAndParseJson(result.response.text());
-  });
+  }, { tier: 'heavy' });
 };

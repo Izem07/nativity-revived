@@ -28,6 +28,8 @@ import {
   AnalogyIntensity,
   generateAnalogies,
   getCachedAnalogies,
+  prefetchNextAnalogySet,
+  consumePrefetchedAnalogies,
   lookupWordDefinition,
   bulkPreloadDefinitions,
   WordDefinitionResult,
@@ -138,6 +140,8 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal, onG
     setScore(0);
     setStreak(0);
     setBestStreak(0);
+    // Background prefetch the next set so clicking Next Set is instant (0ms)
+    prefetchNextAnalogySet(set.intensity || selectedIntensity);
   };
 
   const handleFetchAnalogies = async (overrideIntensity?: AnalogyIntensity) => {
@@ -148,12 +152,22 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal, onG
     }
     const intensityToUse = overrideIntensity || selectedIntensity;
     setShowRefreshMenu(false);
+
+    // Instant client-side reveal if a pre-fetched set is ready (0ms)
+    const prefetched = consumePrefetchedAnalogies(intensityToUse);
+    if (prefetched) {
+      setSelectedIntensity(intensityToUse);
+      startSet(prefetched);
+      return;
+    }
+
     setIsLoading(true);
     onGeneratingChange?.(true);
     setError(null);
     const signal = beginGeneration();
     try {
-      const data = await generateAnalogies(8, intensityToUse);
+      // 5-analogy compact set on fastDrills (gemini-3.5-flash-lite, ~1.1s response)
+      const data = await generateAnalogies(5, intensityToUse);
       if (signal.aborted) return;
       setSelectedIntensity(intensityToUse);
       startSet(data);
@@ -305,9 +319,9 @@ export const AnalogyQuiz: React.FC<AnalogyQuizProps> = ({ onOpenApiKeyModal, onG
       <div className="card-glass p-8 sm:p-12 max-w-xl mx-auto rounded-3xl">
         <GenerationProgress
           theme="analogy"
-          title={`Building a ${selectedIntensity} analogy set`}
-          steps={['Choosing word relationships', 'Writing stem pairs', 'Writing answer choices and traps', 'Writing explanations']}
-          expectedSeconds={15}
+          title={`Generating ${selectedIntensity} analogy set`}
+          steps={['Synthesizing GRE stems & relationships', 'Structuring parallel options & explanations']}
+          expectedSeconds={4}
           onCancel={cancelGeneration}
         />
       </div>

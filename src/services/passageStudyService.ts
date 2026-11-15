@@ -1,4 +1,4 @@
-import { globalKeyPool, speedConfig } from './keyPoolService';
+import { globalKeyPool, getTierGenerationConfig } from './keyPoolService';
 
 // ==========================================
 // PASSAGE STUDY — AP Lang Section I practice test
@@ -116,11 +116,14 @@ Return ONLY JSON with this shape:
 }`;
 
   const parsed = await globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
-    const modelName = fallbackModel || 'gemini-3.8-flash';
+    const modelName = fallbackModel || 'gemini-3.5-flash-lite';
     const model = genAI.getGenerativeModel({
       model: modelName,
       // Lower thinking answers sooner; dropped automatically if a model rejects it
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.9, ...speedConfig(modelName) }
+      generationConfig: getTierGenerationConfig(modelName, {
+        responseMimeType: 'application/json',
+        temperature: 0.9
+      })
     });
     const result = await model.generateContent(prompt, { signal });
     const text = result.response.text().trim().replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
@@ -131,7 +134,7 @@ Return ONLY JSON with this shape:
       if (match) return JSON.parse(match[0]);
       throw new Error('Gemini returned a malformed test. Please try again.');
     }
-  });
+  }, { tier: 'medium' });
 
   const questions: PassageQuestion[] = (Array.isArray(parsed?.questions) ? parsed.questions : [])
     .map((q: any) => ({

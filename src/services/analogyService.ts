@@ -1,4 +1,4 @@
-import { globalKeyPool, speedConfig } from './keyPoolService';
+import { globalKeyPool, getTierGenerationConfig } from './keyPoolService';
 
 // ==========================================
 // ANALOGY QUIZ — AP Lang Analogy Engine
@@ -240,7 +240,15 @@ export async function lookupWordDefinition(rawQuery: string): Promise<WordDefini
 
   // 5. Fallback to Gemini with rotating keys
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
-    const model = genAI.getGenerativeModel({ model: fallbackModel || 'gemini-3.8-flash' });
+    const modelName = fallbackModel || 'gemma-4-31b-it';
+    const isGemma = modelName.toLowerCase().startsWith('gemma');
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: getTierGenerationConfig(modelName, {
+        temperature: 0.2,
+        ...(isGemma ? {} : { responseMimeType: 'application/json' })
+      })
+    });
     const prompt = `Provide a concise dictionary definition for "${targetWord}".
 Return ONLY JSON:
 {
@@ -251,7 +259,17 @@ Return ONLY JSON:
 }`;
     const res = await model.generateContent(prompt);
     const text = res.response.text().trim().replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-    const parsed = JSON.parse(text);
+    let parsed: any;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) {
+        parsed = JSON.parse(match[0]);
+      } else {
+        throw new Error(`Failed to parse definition JSON for ${targetWord}`);
+      }
+    }
     const result: WordDefinitionResult = {
       word: parsed.word || targetWord,
       partOfSpeech: parsed.partOfSpeech || '',
@@ -263,7 +281,7 @@ Return ONLY JSON:
       localStorage.setItem(`NATIVITY_DICT_${cleaned}`, JSON.stringify(result));
     } catch {}
     return result;
-  });
+  }, { tier: 'fast' });
 }
 
 /**
@@ -332,7 +350,15 @@ export async function bulkPreloadDefinitions(
   if (unresolved.length > 0) {
     try {
       await globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel) => {
-        const model = genAI.getGenerativeModel({ model: fallbackModel || 'gemini-3.8-flash' });
+        const modelName = fallbackModel || 'gemma-4-31b-it';
+        const isGemma = modelName.toLowerCase().startsWith('gemma');
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: getTierGenerationConfig(modelName, {
+            temperature: 0.2,
+            ...(isGemma ? {} : { responseMimeType: 'application/json' })
+          })
+        });
         const prompt = `Provide concise collegiate dictionary definitions for each of these words: ${JSON.stringify(unresolved)}.
 Return ONLY a JSON array of objects with schema:
 [
@@ -345,7 +371,17 @@ Return ONLY a JSON array of objects with schema:
 ]`;
         const res = await model.generateContent(prompt);
         const text = res.response.text().trim().replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-        const parsed: any[] = JSON.parse(text);
+        let parsed: any[];
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          const match = text.match(/\[[\s\S]*\]/);
+          if (match) {
+            parsed = JSON.parse(match[0]);
+          } else {
+            throw new Error('Failed to parse batch definitions JSON');
+          }
+        }
         if (Array.isArray(parsed)) {
           for (const item of parsed) {
             const w = String(item.word || '').trim().toLowerCase();
@@ -364,7 +400,7 @@ Return ONLY a JSON array of objects with schema:
             }
           }
         }
-      });
+      }, { tier: 'fast' });
     } catch {}
   }
 
@@ -420,6 +456,52 @@ export function setCachedAnalogies(set: AnalogySet): void {
   } catch {}
 }
 
+const PREFETCH_KEY_PREFIX = 'NATIVITY_ANALOGY_PREFETCH_';
+let isPrefetching = false;
+
+/**
+ * Background pre-fetcher: Silently generates the next set of analogies while the user is
+ * solving the current set. When the user finishes and requests a new set, it loads in 0ms.
+ */
+export async function prefetchNextAnalogySet(intensity: AnalogyIntensity = 'Standard'): Promise<void> {
+  if (isPrefetching) return;
+  const existing = localStorage.getItem(`${PREFETCH_KEY_PREFIX}${intensity}`);
+  if (existing) {
+    try {
+      const parsed = JSON.parse(existing);
+      if (isValidAnalogySet(parsed)) return;
+    } catch {}
+  }
+
+  isPrefetching = true;
+  try {
+    const nextSet = await generateAnalogies(5, intensity);
+    localStorage.setItem(`${PREFETCH_KEY_PREFIX}${intensity}`, JSON.stringify(nextSet));
+  } catch (err) {
+    // Silent catch for background prefetch
+    console.debug('[AnalogyService] Background prefetch note:', err);
+  } finally {
+    isPrefetching = false;
+  }
+}
+
+/**
+ * Consumes the prefetched set for instant 0ms transition.
+ */
+export function consumePrefetchedAnalogies(intensity: AnalogyIntensity): AnalogySet | null {
+  try {
+    const raw = localStorage.getItem(`${PREFETCH_KEY_PREFIX}${intensity}`);
+    if (!raw) return null;
+    localStorage.removeItem(`${PREFETCH_KEY_PREFIX}${intensity}`);
+    const set = JSON.parse(raw);
+    if (isValidAnalogySet(set)) {
+      setCachedAnalogies(set);
+      return set;
+    }
+  } catch {}
+  return null;
+}
+
 const BASE_PROMPT = `You are an expert author of GRE-style verbal analogy questions for advanced AP English Language students.
 An analogy compares two things that seem unrelated but are related in some respect. Each question tests whether the student can
 recognize the relationship in a stem pair and identify the answer pair with the parallel relationship.
@@ -442,27 +524,36 @@ RELATIONSHIP TYPES — spread questions across these categories:
 - CAUSE_EFFECT: one word leads to or results in the other (preparation : success)
 
 RULES:
-1. "pair" MUST be an array of two complete English words, e.g. ["phobia", "fear"]. NEVER output single letters, abbreviations, or empty strings.
-2. "choices" MUST be an array of exactly ${ANALOGY_CHOICE_COUNT} option pairs, each an array of two complete English words.
-3. Choices must keep the same order and direction as the stem (if the stem is PART : WHOLE, the answer is PART : WHOLE, not WHOLE : PART).
-4. Distractors must be plausible pairs with clear but different relationships: a reversed direction, a related but different category,
-   or a loose association (like actor : screen). No random words.
-5. "generalSentence" is the blank-filled sentence described above, using "____" for each word.
-6. "bridge" applies the general sentence to both the stem and the correct answer, e.g.
-   "A musician performs as one part of an orchestra as a whole, just as a player participates as one part of a team as a whole."
-7. "rationale" explains briefly why each distractor fails the general sentence.
-8. Randomize "correctIndex" (0 to ${ANALOGY_CHOICE_COUNT - 1}).
-9. Output ONLY a valid JSON array of objects with fields:
-   - "pair": [string, string]
-   - "choices": [[string, string] x ${ANALOGY_CHOICE_COUNT}]
-   - "correctIndex": number
-   - "generalSentence": string
-   - "bridge": string
-   - "category": ${ANALOGY_CATEGORIES.map((c) => `"${c}"`).join(' | ')}
-   - "rationale": string`;
+1. "stem": string in "WORD1 : WORD2" format (e.g. "OBSEQUIOUS : SYCOPHANT"). Complete English words only.
+2. "options": array of exactly ${ANALOGY_CHOICE_COUNT} option pairs, formatted as "choice1 : choice2".
+3. Choices must keep the same order and direction as the stem.
+4. "generalSentence": blank-filled sentence with "____" for each word.
+5. "relationship_bridge": applies the general sentence to both the stem and correct answer.
+6. "explanation": concise breakdown of why the bridge holds and why each distractor fails.
+7. "correct_index": integer (0 to ${ANALOGY_CHOICE_COUNT - 1}).
+8. Return a single JSON object with the "analogies" array:
+{
+  "analogies": [
+    {
+      "stem": "OBSEQUIOUS : SYCOPHANT",
+      "relationship_bridge": "Relationship explanation connecting stem and answer",
+      "generalSentence": "A ____ is characterized by being ____.",
+      "category": "DEFINITION",
+      "options": [
+        "wordA : wordB",
+        "wordC : wordD",
+        "wordE : wordF",
+        "wordG : wordH",
+        "wordI : wordJ"
+      ],
+      "correct_index": 0,
+      "explanation": "Concise breakdown of why the bridge holds and why each distractor fails."
+    }
+  ]
+}`;
 
 export async function generateAnalogies(
-  count: number = 8,
+  count: number = 5,
   intensity: AnalogyIntensity = 'Standard'
 ): Promise<AnalogySet> {
   const intensityInstructions = {
@@ -473,24 +564,22 @@ export async function generateAnalogies(
   }[intensity];
 
   const questions = await globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
-    const modelName = fallbackModel || 'gemini-3.8-flash';
+    const modelName = fallbackModel || 'gemini-3.5-flash-lite';
+    const isGemma = modelName.toLowerCase().startsWith('gemma');
     const model = genAI.getGenerativeModel({
       model: modelName,
-      // JSON mode avoids malformed replies (which force a full retry); lower thinking answers sooner
-      generationConfig: {
-        temperature: 0.85,
+      generationConfig: getTierGenerationConfig(modelName, {
+        temperature: 0.8,
         topP: 0.95,
-        responseMimeType: 'application/json',
-        ...speedConfig(modelName),
-      },
+        ...(isGemma ? {} : { responseMimeType: 'application/json' }),
+      }, 'fastDrills'),
     });
 
-    const fullPrompt = `${BASE_PROMPT}\n\nDifficulty Intensity: ${intensity}. ${intensityInstructions}\nTask: Generate ${count} analogy questions. Return ONLY a valid JSON array matching the schema above.`;
+    const fullPrompt = `${BASE_PROMPT}\n\nDifficulty Intensity: ${intensity}. ${intensityInstructions}\nTask: Generate ${count} analogy questions. Return ONLY a valid JSON object with the "analogies" array matching the schema above.`;
 
     const result = await model.generateContent(fullPrompt, { signal });
     const raw = result.response.text().trim();
     const cleaned = raw.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-    const jsonStr = cleaned.startsWith('[') ? cleaned : '[' + cleaned;
 
     const parsePair = (raw: any): [string, string] => {
       if (Array.isArray(raw)) {
@@ -503,18 +592,27 @@ export async function generateAnalogies(
       return ['', ''];
     };
 
-    const sanitize = (arr: any[]): AnalogyQuestion[] => {
-      return arr
-        .map((item) => ({
-          pair: parsePair(item.pair),
-          choices: (item.choices || []).map((c: any) => parsePair(c)),
-          correctIndex: typeof item.correctIndex === 'number' ? item.correctIndex : 0,
-          generalSentence: String(item.generalSentence || ''),
-          bridge: String(item.bridge || ''),
-          category: ANALOGY_CATEGORIES.includes(item.category) ? item.category : 'DEFINITION',
-          rationale: String(item.rationale || '')
-        }))
-        // Drop malformed questions rather than showing an unanswerable one
+    const sanitize = (items: any[]): AnalogyQuestion[] => {
+      return items
+        .map((item) => {
+          const stemRaw = item.stem ?? item.pair;
+          const optionsRaw = item.options ?? item.choices ?? [];
+          const correctIdx = typeof item.correct_index === 'number'
+            ? item.correct_index
+            : (typeof item.correctIndex === 'number' ? item.correctIndex : 0);
+          const bridgeText = String(item.relationship_bridge || item.bridge || '');
+          const explText = String(item.explanation || item.rationale || '');
+
+          return {
+            pair: parsePair(stemRaw),
+            choices: (Array.isArray(optionsRaw) ? optionsRaw : []).map((c: any) => parsePair(c)),
+            correctIndex: correctIdx,
+            generalSentence: String(item.generalSentence || ''),
+            bridge: bridgeText,
+            category: ANALOGY_CATEGORIES.includes(item.category) ? item.category : 'DEFINITION',
+            rationale: explText
+          };
+        })
         .filter(
           (q: AnalogyQuestion) =>
             q.pair[0] &&
@@ -525,18 +623,40 @@ export async function generateAnalogies(
         );
     };
 
+    let parsedJson: any = null;
     try {
-      const parsed = JSON.parse(jsonStr) as any[];
-      return sanitize(parsed);
+      parsedJson = JSON.parse(cleaned);
     } catch {
-      const match = cleaned.match(/\[[\s\S]*\]/);
-      if (match) {
-        const parsed = JSON.parse(match[0]) as any[];
-        return sanitize(parsed);
+      const matchObj = cleaned.match(/\{[\s\S]*\}/);
+      if (matchObj) {
+        try {
+          parsedJson = JSON.parse(matchObj[0]);
+        } catch {}
       }
-      throw new Error('Analogy generator returned malformed JSON. Please try again.');
+      if (!parsedJson) {
+        const matchArr = cleaned.match(/\[[\s\S]*\]/);
+        if (matchArr) {
+          try {
+            parsedJson = JSON.parse(matchArr[0]);
+          } catch {}
+        }
+      }
     }
-  });
+
+    if (parsedJson) {
+      if (Array.isArray(parsedJson)) {
+        return sanitize(parsedJson);
+      }
+      if (Array.isArray(parsedJson.analogies)) {
+        return sanitize(parsedJson.analogies);
+      }
+      if (Array.isArray(parsedJson.questions)) {
+        return sanitize(parsedJson.questions);
+      }
+    }
+
+    throw new Error('Analogy generator returned malformed JSON. Please try again.');
+  }, { tier: 'fastDrills' });
 
   if (questions.length === 0) {
     throw new Error('Analogy generator returned no usable questions. Please try again.');
