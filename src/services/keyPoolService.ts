@@ -93,12 +93,13 @@ export const MODEL_POOLS = {
     'gemini-3.8-flash',      // 20 RPD  — confirmed ✓
     'gemini-3.6-flash',      // 20 RPD  — confirmed ✓
   ],
-  // 60 combined RPD — Deep AP Lang rhetorical analysis & complex synthesis
+  // 1,060 combined RPD — Deep AP Lang rhetorical analysis & complex synthesis
   deepReasoning: [
     'gemini-4-hydrogen',     // 20 RPD — confirmed ✓ (best free-tier reasoning model)
     'gemini-3.8-flash',      // 20 RPD — confirmed ✓
     'gemini-3.6-flash',      // 20 RPD — confirmed ✓
-    'gemini-3.5-flash-lite', // 500 RPD — ultimate fallback, confirmed ✓
+    'gemini-3.5-flash-lite', // 500 RPD — high throughput fallback, confirmed ✓
+    'gemini-3.1-flash-lite', // 500 RPD — safety net, confirmed ✓
   ],
 };
 
@@ -165,8 +166,16 @@ export async function scheduleTierTurn(tier: string, signal?: AbortSignal): Prom
 
 // Daily free quota used up, per key. Cleared on reload.
 const exhaustedModelsByKey = new Map<string, Set<string>>();
-// Model names that don't exist for this API
-const missingModels = new Set<string>();
+// Model names that don't exist for this API or have 0/0 quota in AI Studio free tier
+const missingModels = new Set<string>([
+  'gemini-3-flash',
+  'gemini-4-argon',
+  'gemini-4-carbon',
+  'gemini-3.1-pro',
+  'gemini-2-flash',
+  'gemini-2-flash-lite',
+  'gemini-2.5-pro'
+]);
 // Models returning 503 "overloaded" or timed out: skipped until this timestamp
 const busyModelsUntil = new Map<string, number>();
 const BUSY_COOLDOWN_MS = 30_000;
