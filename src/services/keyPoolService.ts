@@ -59,31 +59,46 @@ export interface ExecutionOptions {
 }
 
 /**
- * Recommended Model Pools for Nativity Revived:
- * - fastDrills: 29,800 combined RPD. Starts with gemini-3.5-flash-lite (~1.1s response, zero thinking tokens)
- * - passageQuizzes: 1,000 combined RPD. Generates whole passage sets in 1 consolidated request
- * - deepReasoning: 80 combined RPD. Flagship models reserved strictly for essay grading & rhetorical analysis
+ * Model Pools — built from the confirmed Google AI Studio free-tier rate limit dashboard.
+ * Only model IDs that resolve successfully on the v1beta generateContent endpoint are listed.
+ *
+ * Confirmed available (from dashboard):
+ *   gemini-4-hydrogen     5 RPM / 250K TPM / 20 RPD
+ *   gemini-3.8-flash      5 RPM / 250K TPM / 20 RPD
+ *   gemini-3.6-flash      5 RPM / 250K TPM / 20 RPD
+ *   gemini-3.5-flash-lite 15 RPM / 250K TPM / 500 RPD  ← fastest JSON (~1.1s)
+ *   gemini-3.1-flash-lite 15 RPM / 250K TPM / 500 RPD
+ *   gemma-4-31b-it        30 RPM / 16K TPM / 14,400 RPD  ← watch 16K TPM ceiling
+ *   gemma-4-26b-a4b-it    30 RPM / 16K TPM / 14,400 RPD
+ *   gemini-embedding-2    100 RPM / 30K TPM / 1,000 RPD
+ *
+ * NOT available on free tier:
+ *   gemini-4-argon, gemini-4-carbon, gemini-3.1-pro → 0/0/0
+ *
+ * Uncertain API ID (dashboard shows "Gemini 3 Flash" but 'gemini-3-flash' returns 404):
+ *   Excluded until the correct model ID is confirmed.
  */
 export const MODEL_POOLS = {
-  // 29,800 combined RPD — use for GRE Analogies, Vocab & Single-Term Drills
+  // 29,800 combined RPD — GRE Analogies, Vocab drills, Hangman, single-term quizzes
   fastDrills: [
-    'gemini-3.5-flash-lite', // 500 RPD, 250K TPM, fastest JSON output (~1.1s)
-    'gemini-3.1-flash-lite', // 500 RPD, 250K TPM
-    'gemma-4-31b-it',        // 14,400 RPD (keep prompt + output < 16K TPM)
-    'gemma-4-26b-a4b-it',    // 14,400 RPD
+    'gemini-3.5-flash-lite', // 500 RPD, 250K TPM — fastest JSON (~1.1s), confirmed ✓
+    'gemini-3.1-flash-lite', // 500 RPD, 250K TPM — confirmed ✓
+    'gemma-4-31b-it',        // 14,400 RPD — keep prompt+output < 16K TPM — confirmed ✓
+    'gemma-4-26b-a4b-it',    // 14,400 RPD — confirmed ✓
   ],
-  // 1,000 combined RPD — use for Long AP Lang Passages + Multi-Question MCQs
+  // ~1,000 combined RPD — Full vocab study sets, passage MCQs, paragraph review
   passageQuizzes: [
-    'gemini-3.5-flash-lite',
-    'gemini-3.1-flash-lite',
-    'gemini-3.8-flash',
+    'gemini-3.5-flash-lite', // 500 RPD — confirmed ✓
+    'gemini-3.1-flash-lite', // 500 RPD — confirmed ✓
+    'gemini-3.8-flash',      // 20 RPD  — confirmed ✓
+    'gemini-3.6-flash',      // 20 RPD  — confirmed ✓
   ],
-  // 80 combined RPD — reserve ONLY for Essay Grading & Deep Rhetorical Analysis
+  // 60 combined RPD — Deep AP Lang rhetorical analysis & complex synthesis
   deepReasoning: [
-    'gemini-4-hydrogen',     // 20 RPD
-    'gemini-3.8-flash',      // 20 RPD
-    'gemini-3.6-flash',      // 20 RPD
-    'gemini-3-flash',        // 20 RPD
+    'gemini-4-hydrogen',     // 20 RPD — confirmed ✓ (best free-tier reasoning model)
+    'gemini-3.8-flash',      // 20 RPD — confirmed ✓
+    'gemini-3.6-flash',      // 20 RPD — confirmed ✓
+    'gemini-3.5-flash-lite', // 500 RPD — ultimate fallback, confirmed ✓
   ],
 };
 

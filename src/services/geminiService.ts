@@ -404,7 +404,7 @@ export const generateRhetoricalContent = async (
   difficulty: 'easy' | 'standard' | 'hard' = 'standard'
 ): Promise<RhetoricalGenerationResult> => {
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
-    const modelName = fallbackModel || 'gemini-4-hydrogen';
+    const modelName = fallbackModel || 'gemini-4-hydrogen'; // Best free-tier reasoning model (20 RPD, confirmed ✓)
     const model = genAI.getGenerativeModel({
       model: modelName,
       // JSON mode avoids malformed replies; lower thinking answers sooner and temperature provides high factual accuracy
@@ -542,7 +542,7 @@ export const generateMoreRhetoricalPassage = async (
   customTopic: string = ''
 ): Promise<RhetoricalPassageData> => {
   return globalKeyPool.executeWithRotation(async (genAI, _key, fallbackModel, signal) => {
-    const modelName = fallbackModel || 'gemini-4-hydrogen';
+    const modelName = fallbackModel || 'gemini-4-hydrogen'; // Best free-tier reasoning model (20 RPD, confirmed ✓)
     const model = genAI.getGenerativeModel({
       model: modelName,
       generationConfig: getTierGenerationConfig(modelName, { responseMimeType: 'application/json' })
